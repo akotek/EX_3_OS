@@ -1,10 +1,23 @@
-#include <iostream>
-#include <vector>
-
-using namespace std;
-
+//#include <iostream>
+//#include <vector>
+//#include <string>
+//#include "MapReduceClient.h"
+//using namespace std;
+//
+//struct A{
+//    int a;
+//};
+//
 //int main()
 //{
+//    int num=5;
+//    vector<A> arr;
+//    for (int i =0; i<num; i++){
+//        arr.push_back(A{5});
+//    }
+//    for(A &i : arr)
+//        cout << i.a << endl;
+//
 //    std::vector<std::vector<int>> vec;
 //    vector<int> a;
 //    a.push_back(1);
@@ -17,7 +30,7 @@ using namespace std;
 //    vec.push_back(a);
 //    vec.push_back(b);
 //
-//    cout << vec[0][0] << endl;
+// //   cout << vec[0][0] << endl;
 //
 //    return 0;
 //}
