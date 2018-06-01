@@ -46,7 +46,7 @@ public:
 
 			KChar* k2 = new KChar(i);
 			VCount* v2 = new VCount(counts[i]);
-			//emit2(k2, v2, context);
+			emit2(k2, v2, context);
 		}
 	}
 

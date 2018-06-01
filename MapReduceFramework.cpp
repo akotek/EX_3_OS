@@ -4,15 +4,14 @@
 using namespace std;
 
 
-// a Thread structure
-class ThreadContext{
-public:
 
-    int tId;
-    std::atomic<int>* actionsCounter;
-    vector<InputPair>& inputPairPtr;
-
-private:
+struct ThreadContext{
+    int threadId;
+    std::atomic<int>& actionsCounter;
+    const InputVec& inputVec;
+    const OutputVec& outputVec;
+    IntermediateVec& interMidVec;
+    const MapReduceClient& client;
 };
 
 void emit2 (K2* key, V2* value, void* context);
@@ -25,20 +24,22 @@ void runMapReduceFramework(const MapReduceClient& client,
                            int multiThreadLevel){
 
 
-    // Spawn threads:
+    // Spawn threads,
+    // Create a threadPool array
+    // And init contexts:
     printf("Creating %d threads \n", multiThreadLevel);
     pthread_t threads[multiThreadLevel];
     ThreadContext contexts[multiThreadLevel];
-    vector< vector<InputPair> > thInputPairs; // Each vector reps a Thread
-    std::atomic<int> atomic_counter(0); // shared variable
+    vector<IntermediateVec> interMidVec;
+    std::atomic<int> atomic_counter(0);
 
     for (int i = 0; i < multiThreadLevel; ++i) {
-        contexts[i] = {i, &atomic_counter, thInputPairs[i]};
-
+        contexts[i] = {i, atomic_counter, inputVec, outputVec,
+                       interMidVec[i], client};
     }
 
     for (int i = 0; i < multiThreadLevel; ++i) {
-        pthread_create(threads + i, nullptr, action, contexts + i);
+        pthread_create(&threads[i], nullptr, action, &contexts[i]);
     }
 
     // Join threads:
@@ -49,11 +50,28 @@ void runMapReduceFramework(const MapReduceClient& client,
 
 }
 
+void emit2 (K2* key, V2* value, void* context){
+    ThreadContext* thCtx = (ThreadContext*)context;
+
+    IntermediateVec& vec = thCtx->interMidVec;
+    IntermediatePair pair = {key, value};
+
+    // Vec copies pair by value
+    vec.push_back(pair);
+}
+
 void* action(void* arg){
 
     ThreadContext* thCtx = (ThreadContext*)arg;
 
-    thCtx->actionsCounter += 1;
+    // Increment val
+    int oldVal = (thCtx->actionsCounter)++;
+
+    // Get pair of oldVal and map it
+    const InputPair& pair = thCtx->inputVec[oldVal];
+    const MapReduceClient& client = thCtx->client;
+
+    client.map(pair.first, pair.second, thCtx);
 
     pthread_exit(nullptr);
 }
