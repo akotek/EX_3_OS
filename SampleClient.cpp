@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <string>
 #include <array>
+#include "MapReduceClient.h"
+#include "MapReduceFramework.h"
 
 class VString : public V1 {
 public:
@@ -44,7 +46,7 @@ public:
 
 			KChar* k2 = new KChar(i);
 			VCount* v2 = new VCount(counts[i]);
-			emit2(k2, v2, context);
+			//emit2(k2, v2, context);
 		}
 	}
 
@@ -59,7 +61,7 @@ public:
 		}
 		KChar* k3 = new KChar(c);
 		VCount* v3 = new VCount(count);
-		emit3(k3, v3, context);
+		//emit3(k3, v3, context);
 	}
 };
 
@@ -68,7 +70,7 @@ int main(int argc, char** argv)
 {
 	CounterClient client;
 	InputVec inputVec;
-	OutputVec outputVec;
+	OutputVec outputVec; // starts empty
 	VString s1("This string is full of characters");
 	VString s2("Multithreading is awesome");
 	VString s3("conditions are race bad");

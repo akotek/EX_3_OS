@@ -4,6 +4,7 @@ project(EX_3)
 set(CMAKE_CXX_STANDARD 11)
 
 set(SOURCE_FILES main.cpp MapReduceClient.h MapReduceFramework.h
-        MapReduceClient.cpp MapReduceFramework.cpp atomicdemo/atomicdemo.cpp)
+        MapReduceClient.cpp MapReduceFramework.cpp SampleClient.cpp
+        )
 add_executable(EX_3 ${SOURCE_FILES})
 TARGET_LINK_LIBRARIES(EX_3 pthread)

@@ -7,7 +7,7 @@ using namespace std;
 #define THREADS_NUM 1
 
 pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t mutex2 = PTHREAD_MUTEX_INITIALIZER;
+sem_t semaphore;
 pthread_cond_t aCond = PTHREAD_COND_INITIALIZER;
 
 struct passingData {
