@@ -30,12 +30,13 @@ void runMapReduceFramework(const MapReduceClient& client,
     printf("Creating %d threads \n", multiThreadLevel);
     pthread_t threads[multiThreadLevel];
     vector<ThreadContext> contexts;
-    vector<IntermediateVec> interMidVec(multiThreadLevel); // vector of vectors
+    IntermediateVec interMidVec(multiThreadLevel);
+    vector<IntermediateVec> allVec; // vector of vectors
     std::atomic<int> atomic_counter(0);
 
     for (int i = 0; i < multiThreadLevel; i++) {
         contexts.push_back(ThreadContext{i, atomic_counter, inputVec, outputVec,
-                       interMidVec[i], client});
+                      allVec[i], client});
     }
 
     for (int i = 0; i < multiThreadLevel; i++) {
