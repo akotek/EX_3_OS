@@ -71,9 +71,9 @@ void runMapReduceFramework(const MapReduceClient& client,
     printf("Completed joining %d threads \n", multiThreadLevel);
 
     // Printing data
-    for(IntermediateVec &v : allVec){
-        cout << v.size() << endl;
-    }
+//    for(IntermediateVec &v : allVec){
+//        cout << v.size() << endl;
+//    }
 }
 
 
@@ -88,22 +88,23 @@ void emit2 (K2* key, V2* value, void* context){
     vec.push_back(pair);
 }
 
-void findK2max(vector<IntermediateVec>& allVec)
+K2& findK2max(vector<IntermediateVec>& allVec)
 {
-    //
     K2* k2max = allVec[0][allVec[0].size()-1].first;
+
 
     for(IntermediateVec& intermediateVec : allVec)
     {
-        K2* tempKey = intermediateVec[intermediateVec.size()-1].first;
-        if (k2max < tempKey)
+        if (!intermediateVec.empty())
         {
-            k2max = tempKey;
+            K2 *tempKey = intermediateVec[intermediateVec.size() - 1].first;
+            if (k2max < tempKey)
+            {
+                k2max = tempKey;
+            }
         }
-
     }
-    cout << k2max << endl;
-//    return k2max;
+    return *k2max; // Returns REFERENCEEEEEEEE
 }
 
 void* action(void* arg){
@@ -134,7 +135,10 @@ void* action(void* arg){
     // Shuffle by thread 0:
     if (threadContext->threadId == 0){
         vector<IntermediateVec>& allVec = threadContext->allVec;
-        findK2max(allVec);
+        K2& a = findK2max(allVec);
+
+
+        cout << "bla" << endl;
     }
 
 
