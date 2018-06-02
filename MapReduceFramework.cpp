@@ -31,6 +31,11 @@ bool operator==(const IntermediatePair& a, const IntermediatePair& b)
     return !(*a.first < *b.first) && !(*b.first < *a.first);
 }
 
+bool operator==(const K2& a, const K2& b)
+{
+    return !(a < b) && !(b < a);
+}
+
 // func decelerations:
 // ---------------
 void emit2 (K2* key, V2* value, void* context);
@@ -107,6 +112,8 @@ K2& findK2max(vector<IntermediateVec>& allVec)
     return *k2max; // Returns REFERENCEEEEEEEE
 }
 
+
+
 void* action(void* arg){
 
     ThreadContext* threadContext = (ThreadContext*)arg;
@@ -133,15 +140,32 @@ void* action(void* arg){
     threadContext->barrier.barrier();
 
     // Shuffle by thread 0:
-    if (threadContext->threadId == 0){
+    if (threadContext->threadId == 0)
+    {
         vector<IntermediateVec>& allVec = threadContext->allVec;
-        K2& a = findK2max(allVec);
+        IntermediateVec maxVec;
+        K2& k2max = findK2max(allVec); // the k2 key max value
+
+        for(IntermediateVec& intermediateVec : allVec)
+        {
+//            if (!intermediateVec.empty() &&
+//                    *(intermediateVec[intermediateVec.size()-1]).first == k2max)
+//            {
+                while (!intermediateVec.empty() &&
+                       *(intermediateVec[intermediateVec.size()-1]).first == k2max)
+                {
+                    maxVec.push_back(intermediateVec[intermediateVec.size()-1]);
+                    intermediateVec.pop_back();
+                }
+
+//            }
+        }
 
 
-        cout << "bla" << endl;
+
+
+
     }
-
-
 
 
     pthread_exit(nullptr);
