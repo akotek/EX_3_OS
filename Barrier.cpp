@@ -33,17 +33,20 @@ void Barrier::barrier()
 	}
 
 	if (++count < numThreads) {
+		// Do wait
 		if (pthread_cond_wait(&cv, &mutex) != 0){
 			fprintf(stderr, "[[Barrier]] error on pthread_cond_wait");
 			exit(1);
 		}
 	} else {
 		count = 0;
+		// wake up all the other threads that wait
 		if (pthread_cond_broadcast(&cv) != 0) {
 			fprintf(stderr, "[[Barrier]] error on pthread_cond_broadcast");
 			exit(1);
 		}
 	}
+	// Unlock
 	if (pthread_mutex_unlock(&mutex) != 0) {
 		fprintf(stderr, "[[Barrier]] error on pthread_mutex_unlock");
 		exit(1);

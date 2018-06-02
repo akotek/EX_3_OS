@@ -2,6 +2,7 @@
 #include <atomic>
 #include <algorithm>
 #include "MapReduceClient.h"
+#include "Barrier.h"
 using namespace std;
 
 struct ThreadContext{
@@ -9,12 +10,12 @@ struct ThreadContext{
     std::atomic<int>& actionsCounter;
     const InputVec& inputVec;
     OutputVec& outputVec;
-    IntermediateVec& interMidVec;
+    vector<IntermediateVec>& allVec;
     const MapReduceClient& client;
+    Barrier& barrier;
+    vector<IntermediateVec>& queue;
 
 };
-
-
 
 struct {
     bool operator()(const IntermediatePair& a, const IntermediatePair& b) const
@@ -23,6 +24,12 @@ struct {
     }
 
 } InterMidGreater;
+
+// equal operator for the shuffle section
+bool operator==(const IntermediatePair& a, const IntermediatePair& b)
+{
+    return !(*a.first < *b.first) && !(*b.first < *a.first);
+}
 
 // func decelerations:
 // ---------------
@@ -38,16 +45,19 @@ void runMapReduceFramework(const MapReduceClient& client,
     // Spawn threads,
     // Create a threadPool array
     // And init contexts:
+    multiThreadLevel -=1; //TODO find out about mainThread
     printf("Creating %d threads \n", multiThreadLevel);
     pthread_t threads[multiThreadLevel];
     vector<ThreadContext> contexts;
+    Barrier barrier(multiThreadLevel);
     vector<IntermediateVec> allVec(multiThreadLevel); // vector of vectors
+    vector<IntermediateVec> shuffledQueue(multiThreadLevel);
     std::atomic<int> atomic_counter(0);
 
     for (int i = 0; i < multiThreadLevel; i++) {
         contexts.push_back(ThreadContext{i, atomic_counter, inputVec,
-                                         outputVec,
-                      allVec[i], client});
+                                         outputVec, allVec, client, barrier,
+        shuffledQueue});
     }
 
     for (int i = 0; i < multiThreadLevel; i++) {
@@ -65,24 +75,38 @@ void runMapReduceFramework(const MapReduceClient& client,
         cout << v.size() << endl;
     }
 }
-//
 
 
 void emit2 (K2* key, V2* value, void* context){
 
     ThreadContext* thCtx = (ThreadContext*)context;
 
-    IntermediateVec& vec = thCtx->interMidVec;
+    IntermediateVec& vec = thCtx->allVec[thCtx->threadId];
     IntermediatePair pair = {key, value};
 
     // Vec copies pair by value
     vec.push_back(pair);
 }
 
+void findK2max(vector<IntermediateVec>& allVec)
+{
+    //
+    K2* k2max = allVec[0][allVec[0].size()-1].first;
+
+    for(IntermediateVec& intermediateVec : allVec)
+    {
+        K2* tempKey = intermediateVec[intermediateVec.size()-1].first;
+        if (k2max < tempKey)
+        {
+            k2max = tempKey;
+        }
+
+    }
+    cout << k2max << endl;
+//    return k2max;
+}
 
 void* action(void* arg){
-
-    // map section
 
     ThreadContext* threadContext = (ThreadContext*)arg;
 
@@ -94,18 +118,27 @@ void* action(void* arg){
     const int inputSize = (int)threadContext->inputVec.size();
 
     while (oldVal < inputSize){
+        // Map
         const InputPair& pair = threadContext->inputVec[oldVal];
         client.map(pair.first, pair.second, threadContext);
         oldVal = (threadContext->actionsCounter)++;
     }
-    // sort section
-    IntermediateVec& vec = threadContext->interMidVec;
-    std::sort(threadContext->interMidVec.begin(), threadContext->interMidVec.end(), InterMidGreater);
+    // Sort
+    IntermediateVec& intermediateVec = threadContext->allVec[threadContext->threadId];
+    std::sort(intermediateVec.begin(), intermediateVec.end(), InterMidGreater);
 
+
+    // Launch barrier
+    threadContext->barrier.barrier();
+
+    // Shuffle by thread 0:
+    if (threadContext->threadId == 0){
+        vector<IntermediateVec>& allVec = threadContext->allVec;
+        findK2max(allVec);
+    }
 
 
 
 
     pthread_exit(nullptr);
 }
-//

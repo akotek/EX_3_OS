@@ -1,7 +1,7 @@
 
 
-
-
+Questions to eshed:
+* Main thread
 
 -------------
 pthread.wait process:
@@ -15,12 +15,7 @@ guard(mutex) ??
 
 * think on thread_safety and exception_safe when we implement
 
-
 * if using pthread_mutex on a locked thread-- it will block calling
 thread until mutex is unlock --> then will wake thread
-
-
-
-
 
 ** take care of return values: if -1 do... if 0 do.....
