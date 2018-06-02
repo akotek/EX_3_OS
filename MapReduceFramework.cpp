@@ -14,6 +14,16 @@ struct ThreadContext{
 
 };
 
+
+
+struct {
+    bool operator()(const IntermediatePair& a, const IntermediatePair& b) const
+    {
+        return *a.first < *b.first;
+    }
+
+} InterMidGreater;
+
 // func decelerations:
 // ---------------
 void emit2 (K2* key, V2* value, void* context);
@@ -52,16 +62,14 @@ void runMapReduceFramework(const MapReduceClient& client,
 
     // Printing data
     for(IntermediateVec &v : allVec){
-        for(IntermediatePair &i : v){
-            cout << i.first << endl;
-            cout << i.second << endl;
-        }
+        cout << v.size() << endl;
     }
 }
-
+//
 
 
 void emit2 (K2* key, V2* value, void* context){
+
     ThreadContext* thCtx = (ThreadContext*)context;
 
     IntermediateVec& vec = thCtx->interMidVec;
@@ -71,13 +79,6 @@ void emit2 (K2* key, V2* value, void* context){
     vec.push_back(pair);
 }
 
-struct {
-    bool operator()(IntermediatePair a, IntermediatePair b) const
-    {
-        return a.first < b.first;
-    }
-
-} InterMidGreater;
 
 void* action(void* arg){
 
@@ -99,7 +100,7 @@ void* action(void* arg){
     }
     // sort section
     IntermediateVec& vec = threadContext->interMidVec;
-    std::sort(vec.begin(), vec.end(), InterMidGreater);
+    std::sort(threadContext->interMidVec.begin(), threadContext->interMidVec.end(), InterMidGreater);
 
 
 
