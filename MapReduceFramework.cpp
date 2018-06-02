@@ -56,7 +56,7 @@ void runMapReduceFramework(const MapReduceClient& client,
     vector<ThreadContext> contexts;
     Barrier barrier(multiThreadLevel);
     vector<IntermediateVec> allVec(multiThreadLevel); // vector of vectors
-    vector<IntermediateVec> shuffledQueue(multiThreadLevel);
+    vector<IntermediateVec> shuffledQueue;
     std::atomic<int> atomic_counter(0);
 
     for (int i = 0; i < multiThreadLevel; i++) {
@@ -143,23 +143,44 @@ void* action(void* arg){
     if (threadContext->threadId == 0)
     {
         vector<IntermediateVec>& allVec = threadContext->allVec;
-        IntermediateVec maxVec;
-        K2& k2max = findK2max(allVec); // the k2 key max value
 
-        for(IntermediateVec& intermediateVec : allVec)
+        while (!allVec.empty())
         {
+            IntermediateVec tempMaxVec;
+            K2& k2max = findK2max(allVec); // the k2 key max value
+
+            int currentVec = 0;
+            for(IntermediateVec& intermediateVec : allVec)
+            {
 //            if (!intermediateVec.empty() &&
 //                    *(intermediateVec[intermediateVec.size()-1]).first == k2max)
 //            {
                 while (!intermediateVec.empty() &&
                        *(intermediateVec[intermediateVec.size()-1]).first == k2max)
                 {
-                    maxVec.push_back(intermediateVec[intermediateVec.size()-1]);
+                    tempMaxVec.push_back(intermediateVec[intermediateVec.size()-1]);
                     intermediateVec.pop_back();
+
+                    if(intermediateVec.empty())
+                    {
+                        allVec.erase(std::remove(allVec.begin(), allVec.end(), intermediateVec),
+                                     allVec.end()); // remove
+                    }
                 }
+                currentVec++;
 
 //            }
+            }
+            // mutex lock
+            threadContext->queue.push_back(tempMaxVec);
+            tempMaxVec.clear();
+            // mutex unlock
+
+
         }
+
+
+
 
 
 
