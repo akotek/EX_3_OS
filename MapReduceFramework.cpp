@@ -49,6 +49,13 @@ void runMapReduceFramework(const MapReduceClient& client,
     }
     printf("Completed joining %d threads \n", multiThreadLevel);
 
+    // Printing data
+    for(IntermediateVec &v : allVec){
+        for(IntermediatePair &i : v){
+            cout << i.first << endl;
+            cout << i.second << endl;
+        }
+    }
 }
 
 void emit2 (K2* key, V2* value, void* context){
@@ -63,16 +70,20 @@ void emit2 (K2* key, V2* value, void* context){
 
 void* action(void* arg){
 
-    ThreadContext* thCtx = (ThreadContext*)arg;
+    ThreadContext* threadContext = (ThreadContext*)arg;
 
     // Increment val
-    int oldVal = (thCtx->actionsCounter)++;
+    int oldVal = (threadContext->actionsCounter)++;
 
     // Get pair of oldVal and map it
-    const InputPair& pair = thCtx->inputVec[oldVal];
-    const MapReduceClient& client = thCtx->client;
+    const MapReduceClient& client = threadContext->client;
+    const int inputSize = (int)threadContext->inputVec.size();
 
-    client.map(pair.first, pair.second, thCtx);
+    while (oldVal < inputSize){
+        const InputPair& pair = threadContext->inputVec[oldVal];
+        client.map(pair.first, pair.second, threadContext);
+        oldVal = (threadContext->actionsCounter)++;
+    }
 
     pthread_exit(nullptr);
 }

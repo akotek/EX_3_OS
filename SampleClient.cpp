@@ -71,13 +71,21 @@ int main(int argc, char** argv)
 	CounterClient client;
 	InputVec inputVec;
 	OutputVec outputVec; // starts empty
-	VString s1("This string is full of characters");
-	VString s2("Multithreading is awesome");
-	VString s3("conditions are race bad");
+	VString s1("A");
+	VString s2("BB");
+	VString s3("CCC");
+    VString s4("DDDD");
+    VString s5("EEEEE");
+    VString s6("FFFFFF");
 	inputVec.push_back({nullptr, &s1});
 	inputVec.push_back({nullptr, &s2});
 	inputVec.push_back({nullptr, &s3});
-	runMapReduceFramework(client, inputVec, outputVec, 2);
+    inputVec.push_back({nullptr, &s4});
+    inputVec.push_back({nullptr, &s5});
+    inputVec.push_back({nullptr, &s6});
+  //  inputVec.push_back({nullptr, &s4});
+	runMapReduceFramework(client, inputVec, outputVec, 3);
+    // 4
 
 	for (OutputPair& pair: outputVec) {
 		char c = ((const KChar*)pair.first)->c;
