@@ -1,5 +1,6 @@
 #include <iostream>
 #include <atomic>
+#include <algorithm>
 #include "MapReduceClient.h"
 using namespace std;
 
@@ -58,6 +59,8 @@ void runMapReduceFramework(const MapReduceClient& client,
     }
 }
 
+
+
 void emit2 (K2* key, V2* value, void* context){
     ThreadContext* thCtx = (ThreadContext*)context;
 
@@ -68,7 +71,17 @@ void emit2 (K2* key, V2* value, void* context){
     vec.push_back(pair);
 }
 
+struct {
+    bool operator()(IntermediatePair a, IntermediatePair b) const
+    {
+        return a.first < b.first;
+    }
+
+} InterMidGreater;
+
 void* action(void* arg){
+
+    // map section
 
     ThreadContext* threadContext = (ThreadContext*)arg;
 
@@ -84,6 +97,14 @@ void* action(void* arg){
         client.map(pair.first, pair.second, threadContext);
         oldVal = (threadContext->actionsCounter)++;
     }
+    // sort section
+    IntermediateVec& vec = threadContext->interMidVec;
+    std::sort(vec.begin(), vec.end(), InterMidGreater);
+
+
+
+
 
     pthread_exit(nullptr);
 }
+//
