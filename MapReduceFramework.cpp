@@ -25,7 +25,7 @@ struct {
 
 } InterMidGreater;
 
-// equal operator for the shuffle section
+// equal operator for the shuffleHandler section
 bool operator==(const IntermediatePair& a, const IntermediatePair& b)
 {
     return !(*a.first < *b.first) && !(*b.first < *a.first);
@@ -109,7 +109,56 @@ K2& findK2max(vector<IntermediateVec>& allVec)
             }
         }
     }
-    return *k2max; // Returns REFERENCEEEEEEEE
+    return *k2max;
+}
+
+void emit3 (K3* key, V3* value, void* context)
+{
+
+}
+
+
+
+
+/**
+ *
+ * @param threadContext
+ */
+void shuffleHandler(ThreadContext *threadContext)
+{
+
+    vector<IntermediateVec>& allVec = threadContext->allVec;
+
+    while (!allVec.empty())
+    {
+
+        IntermediateVec tempMaxVec;
+        K2& k2max = findK2max(allVec);
+
+        for(IntermediateVec& intermediateVec : allVec)
+        {
+            while (!intermediateVec.empty() &&
+                   *(intermediateVec[intermediateVec.size()-1]).first == k2max)
+            {
+                tempMaxVec.push_back(intermediateVec[intermediateVec.size()-1]);
+                intermediateVec.pop_back();
+
+                if(intermediateVec.empty())
+                {
+                    allVec.erase(std::remove(allVec.begin(), allVec.end(), intermediateVec),
+                                 allVec.end()); // remove
+                }
+            }
+
+//            }
+        }
+        // mutex lock - TODO
+        threadContext->queue.push_back(tempMaxVec);
+        tempMaxVec.clear();
+        // mutex unlock
+
+
+    }
 }
 
 
@@ -142,51 +191,24 @@ void* action(void* arg){
     // Shuffle by thread 0:
     if (threadContext->threadId == 0)
     {
-        vector<IntermediateVec>& allVec = threadContext->allVec;
+        shuffleHandler(threadContext);
+    }
 
-        while (!allVec.empty())
-        {
-            IntermediateVec tempMaxVec;
-            K2& k2max = findK2max(allVec); // the k2 key max value
-
-            int currentVec = 0;
-            for(IntermediateVec& intermediateVec : allVec)
-            {
-//            if (!intermediateVec.empty() &&
-//                    *(intermediateVec[intermediateVec.size()-1]).first == k2max)
-//            {
-                while (!intermediateVec.empty() &&
-                       *(intermediateVec[intermediateVec.size()-1]).first == k2max)
-                {
-                    tempMaxVec.push_back(intermediateVec[intermediateVec.size()-1]);
-                    intermediateVec.pop_back();
-
-                    if(intermediateVec.empty())
-                    {
-                        allVec.erase(std::remove(allVec.begin(), allVec.end(), intermediateVec),
-                                     allVec.end()); // remove
-                    }
-                }
-                currentVec++;
-
-//            }
-            }
-            // mutex lock
-            threadContext->queue.push_back(tempMaxVec);
-            tempMaxVec.clear();
-            // mutex unlock
-
-
-        }
-
-
-
-
-
-
-
+    // Reduce - Concept only - TODO - insert after into a separate function
+    // sem_wait()
+    vector<IntermediateVec>& queue = threadContext->queue;
+    IntermediateVec* queuePiece;
+    // mutex_lock
+    if(!queue.empty())
+    {
+        queuePiece = &queue[queue.size()-1];
+        queue.pop_back();
 
     }
+    // mutex_unlock
+    client.reduce(queuePiece, threadContext);
+
+
 
 
     pthread_exit(nullptr);
