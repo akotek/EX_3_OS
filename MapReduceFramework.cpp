@@ -3,7 +3,13 @@
 #include <algorithm>
 #include "MapReduceClient.h"
 #include "Barrier.h"
+#include <semaphore.h>
+
 using namespace std;
+
+pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
+sem_t fillCount;
+
 
 struct ThreadContext{
     int threadId;
@@ -58,6 +64,11 @@ void runMapReduceFramework(const MapReduceClient& client,
     vector<IntermediateVec> allVec(multiThreadLevel); // vector of vectors
     vector<IntermediateVec> shuffledQueue;
     std::atomic<int> atomic_counter(0);
+
+    // Init semaphores - init with value 0
+    // To be increase by shuffler
+    sem_init(&fillCount, 0, 0);
+
 
     for (int i = 0; i < multiThreadLevel; i++) {
         contexts.push_back(ThreadContext{i, atomic_counter, inputVec,
@@ -149,16 +160,19 @@ void shuffleHandler(ThreadContext *threadContext)
                                  allVec.end()); // remove
                 }
             }
-
-//            }
         }
-        // mutex lock - TODO
+        // mutex_lock
+        pthread_mutex_lock(&queueLock);
         threadContext->queue.push_back(tempMaxVec);
         tempMaxVec.clear();
-        // mutex unlock
+        // mutex_unlock
+        pthread_mutex_unlock(&queueLock);
 
-
+        // semaphore wake up threads
+        sem_post(&fillCount);
     }
+
+    cout << "done" << endl;
 }
 
 
@@ -194,21 +208,23 @@ void* action(void* arg){
         shuffleHandler(threadContext);
     }
 
-    // Reduce - Concept only - TODO - insert after into a separate function
-    // sem_wait()
+
+    // Reduce
     vector<IntermediateVec>& queue = threadContext->queue;
-    IntermediateVec* queuePiece;
-    // mutex_lock
+
     if(!queue.empty())
     {
-        queuePiece = &queue[queue.size()-1];
+        sem_wait(&fillCount);
+
+        // mutex_lock before critical section
+        pthread_mutex_lock(&queueLock);
+        IntermediateVec& queuePiece = queue[queue.size()-1];
         queue.pop_back();
+        // mutex_unlock
+        pthread_mutex_unlock(&queueLock);
 
+        client.reduce(&queuePiece, threadContext);
     }
-    // mutex_unlock
-    client.reduce(queuePiece, threadContext);
-
-
 
 
     pthread_exit(nullptr);
