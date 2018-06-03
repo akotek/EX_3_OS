@@ -21,7 +21,6 @@ struct ThreadContext{
 
 };
 
-
 struct {
     bool operator()(const IntermediatePair& a, const IntermediatePair& b) const
     {
@@ -55,7 +54,6 @@ void runMapReduceFramework(const MapReduceClient& client,
                            int multiThreadLevel){
 
 
-
     // Init semaphores - init with value 0
     // To be increase by shuffler
     pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
@@ -66,7 +64,7 @@ void runMapReduceFramework(const MapReduceClient& client,
     // Create a threadPool array
     // And init contexts:
     multiThreadLevel -=1; //TODO find out about mainThread
-    printf("Creating %d threads \n", multiThreadLevel);
+  //  printf("Creating %d threads \n", multiThreadLevel);
     pthread_t threads[multiThreadLevel];
     vector<ThreadContext> contexts;
     Barrier barrier(multiThreadLevel);
@@ -85,18 +83,16 @@ void runMapReduceFramework(const MapReduceClient& client,
         pthread_create(&threads[i], nullptr, action, &contexts[i]);
     }
 
-
-
     // Join threads:
     for (int i = 0; i < multiThreadLevel; i++) {
         pthread_join(threads[i], nullptr);
     }
-    printf("Completed joining %d threads \n", multiThreadLevel);
+    //printf("Completed joining %d threads \n", multiThreadLevel);
 
     // Destroy semaphore && mutex:
     pthread_mutex_destroy(&queueLock);
     sem_destroy(&fillCount);
-    printf("Completed destroying Mutex and Semaphore \n");
+  //  printf("Completed destroying Mutex and Semaphore \n");
 }
 
 void emit2 (K2* key, V2* value, void* context){
@@ -137,9 +133,6 @@ K2& findK2max(vector<IntermediateVec>& allVec)
     return *k2max;
 }
 
-/**
- * Shuffles
- */
 void shuffleHandler(ThreadContext *threadContext)
 {
 
@@ -169,6 +162,7 @@ void shuffleHandler(ThreadContext *threadContext)
                 }
             }
         }
+
         // Lock
         pthread_mutex_lock(&(threadContext->queueLock));
         threadContext->queue.push_back(tempMaxVec);
@@ -180,7 +174,7 @@ void shuffleHandler(ThreadContext *threadContext)
         sem_post(&threadContext->fillCount);
     }
 
-    cout << "done" << endl;
+    //cout << "Shuffling is done" << endl;
 }
 
 void* action(void* arg){
