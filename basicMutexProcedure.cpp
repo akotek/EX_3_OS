@@ -8,19 +8,13 @@ using namespace std;
 
 pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
 sem_t semaphore;
-pthread_cond_t aCond = PTHREAD_COND_INITIALIZER;
-
-struct passingData {
-    int sign;
-    int sum;
-};
 
 //   Counts from 0 to NUM_OF_LOOPS
 //   Depends on given sign (minus or plus):
-void* countNum(void* incSign){
+void* countNum(void* arg){
 
     // incSign will determine + or -
-    int sign = *(int*)incSign;
+    int sign = *(int*)arg;
     string threadSign =  (sign > 0) ? "tPlus" : "tMinus";
 
     pthread_mutex_lock(&mutex1);

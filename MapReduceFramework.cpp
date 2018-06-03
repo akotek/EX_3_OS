@@ -8,6 +8,7 @@
 using namespace std;
 
 pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t outputVecLock = PTHREAD_MUTEX_INITIALIZER;
 sem_t fillCount;
 
 
@@ -22,6 +23,7 @@ struct ThreadContext{
     vector<IntermediateVec>& queue;
 
 };
+
 
 struct {
     bool operator()(const IntermediatePair& a, const IntermediatePair& b) const
@@ -41,13 +43,6 @@ bool operator==(const K2& a, const K2& b)
 {
     return !(a < b) && !(b < a);
 }
-
-// func decelerations:
-// ---------------
-void emit2 (K2* key, V2* value, void* context);
-void emit3 (K3* key, V3* value, void* context);
-void* action(void* arg);
-// ---------------
 
 void runMapReduceFramework(const MapReduceClient& client,
                            const InputVec& inputVec, OutputVec& outputVec,
@@ -86,29 +81,37 @@ void runMapReduceFramework(const MapReduceClient& client,
     }
     printf("Completed joining %d threads \n", multiThreadLevel);
 
-    // Printing data
-//    for(IntermediateVec &v : allVec){
-//        cout << v.size() << endl;
-//    }
+    // Destroy semaphore && mutex:
+    pthread_mutex_destroy(&queueLock);
+    pthread_mutex_destroy(&outputVecLock);
+    sem_destroy(&fillCount);
+    printf("Completed destroying Mutex and Semaphore \n");
 }
-
 
 void emit2 (K2* key, V2* value, void* context){
 
-    ThreadContext* thCtx = (ThreadContext*)context;
+    ThreadContext* threadContext = (ThreadContext*)context;
 
-    IntermediateVec& vec = thCtx->allVec[thCtx->threadId];
+    IntermediateVec& vec = threadContext->allVec[threadContext->threadId];
     IntermediatePair pair = {key, value};
 
     // Vec copies pair by value
     vec.push_back(pair);
 }
 
+void emit3 (K3* key, V3* value, void* context)
+{
+    ThreadContext* threadContext = (ThreadContext*)context;
+
+    OutputVec& vec = threadContext->outputVec;
+    OutputPair& pair = {key, value};
+
+
+}
+
 K2& findK2max(vector<IntermediateVec>& allVec)
 {
     K2* k2max = allVec[0][allVec[0].size()-1].first;
-
-
     for(IntermediateVec& intermediateVec : allVec)
     {
         if (!intermediateVec.empty())
@@ -123,23 +126,17 @@ K2& findK2max(vector<IntermediateVec>& allVec)
     return *k2max;
 }
 
-void emit3 (K3* key, V3* value, void* context)
-{
-
-}
-
-
-
-
 /**
- *
- * @param threadContext
+ * Shuffles
  */
 void shuffleHandler(ThreadContext *threadContext)
 {
 
-    vector<IntermediateVec>& allVec = threadContext->allVec;
+    // Find kMax value in all interMid pairs,
+    // Collect from all vectors into a new one
+    // Push at the end to new queue:
 
+    vector<IntermediateVec>& allVec = threadContext->allVec;
     while (!allVec.empty())
     {
 
@@ -157,25 +154,23 @@ void shuffleHandler(ThreadContext *threadContext)
                 if(intermediateVec.empty())
                 {
                     allVec.erase(std::remove(allVec.begin(), allVec.end(), intermediateVec),
-                                 allVec.end()); // remove
+                                 allVec.end());
                 }
             }
         }
-        // mutex_lock
+        // Lock
         pthread_mutex_lock(&queueLock);
         threadContext->queue.push_back(tempMaxVec);
         tempMaxVec.clear();
-        // mutex_unlock
+        // Unlock
         pthread_mutex_unlock(&queueLock);
 
-        // semaphore wake up threads
+        // Semaphore wake up threads:
         sem_post(&fillCount);
     }
 
     cout << "done" << endl;
 }
-
-
 
 void* action(void* arg){
 
@@ -189,7 +184,7 @@ void* action(void* arg){
     const int inputSize = (int)threadContext->inputVec.size();
 
     while (oldVal < inputSize){
-        // Map
+        // Map:
         const InputPair& pair = threadContext->inputVec[oldVal];
         client.map(pair.first, pair.second, threadContext);
         oldVal = (threadContext->actionsCounter)++;
@@ -199,7 +194,7 @@ void* action(void* arg){
     std::sort(intermediateVec.begin(), intermediateVec.end(), InterMidGreater);
 
 
-    // Launch barrier
+    // Launch barrier:
     threadContext->barrier.barrier();
 
     // Shuffle by thread 0:
@@ -209,18 +204,17 @@ void* action(void* arg){
     }
 
 
-    // Reduce
+    // Reduce:
     vector<IntermediateVec>& queue = threadContext->queue;
-
     if(!queue.empty())
     {
         sem_wait(&fillCount);
 
-        // mutex_lock before critical section
+        // Lock
         pthread_mutex_lock(&queueLock);
         IntermediateVec& queuePiece = queue[queue.size()-1];
         queue.pop_back();
-        // mutex_unlock
+        // Unlock
         pthread_mutex_unlock(&queueLock);
 
         client.reduce(&queuePiece, threadContext);

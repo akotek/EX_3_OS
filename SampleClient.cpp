@@ -52,15 +52,15 @@ public:
 
 	virtual void reduce(const IntermediateVec* pairs,
 		void* context) const {
-//		const char c = static_cast<const KChar*>(pairs->at(0).first)->c;
-//		int count = 0;
-//		for(const IntermediatePair& pair: *pairs) {
-//			count += static_cast<const VCount*>(pair.second)->count;
-//			delete pair.first;
-//			delete pair.second;
-//		}
-//		KChar* k3 = new KChar(c);
-//		VCount* v3 = new VCount(count);
+		const char c = static_cast<const KChar*>(pairs->at(0).first)->c;
+		int count = 0;
+		for(const IntermediatePair& pair: *pairs) {
+			count += static_cast<const VCount*>(pair.second)->count;
+			delete pair.first;
+			delete pair.second;
+		}
+		KChar* k3 = new KChar(c);
+		VCount* v3 = new VCount(count);
 		//emit3(k3, v3, context);
 	}
 };
@@ -71,7 +71,7 @@ int main(int argc, char** argv)
 	CounterClient client;
 	InputVec inputVec;
 	OutputVec outputVec; // starts empty
-	for (int i = 0; i< 10000; i++){
+	for (int i = 0; i< 1000; i++){
 		VString s1("A");
 		VString s2("BBA");
 		VString s3("CCC");
@@ -85,7 +85,7 @@ int main(int argc, char** argv)
 		inputVec.push_back({nullptr, &s2});
 		inputVec.push_back({nullptr, &s3});
 	}
-	runMapReduceFramework(client, inputVec, outputVec, 8);
+	runMapReduceFramework(client, inputVec, outputVec, 3);
     // 4
 
 	for (OutputPair& pair: outputVec) {
