@@ -4,12 +4,10 @@
 #include "MapReduceClient.h"
 #include "Barrier.h"
 #include <semaphore.h>
-#include <assert.h>
 using namespace std;
 
-pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t outputVecLock = PTHREAD_MUTEX_INITIALIZER;
-sem_t fillCount;
+
+
 
 
 struct ThreadContext{
@@ -21,6 +19,10 @@ struct ThreadContext{
     const MapReduceClient& client;
     Barrier& barrier;
     vector<IntermediateVec>& queue;
+
+    pthread_mutex_t& queueLock;
+    pthread_mutex_t& outputVecLock;
+    sem_t& fillCount;
 
 };
 
@@ -57,6 +59,17 @@ void runMapReduceFramework(const MapReduceClient& client,
                            const InputVec& inputVec, OutputVec& outputVec,
                            int multiThreadLevel){
 
+
+    pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t outputVecLock = PTHREAD_MUTEX_INITIALIZER;
+    sem_t fillCount;
+
+
+    // Init semaphores - init with value 0
+    // To be increase by shuffler
+    sem_init(&fillCount, 0, 0);
+
+
     // Spawn threads,
     // Create a threadPool array
     // And init contexts:
@@ -69,20 +82,20 @@ void runMapReduceFramework(const MapReduceClient& client,
     vector<IntermediateVec> shuffledQueue;
     std::atomic<int> atomic_counter(0);
 
-    // Init semaphores - init with value 0
-    // To be increase by shuffler
-    sem_init(&fillCount, 0, 0);
+
 
 
     for (int i = 0; i < multiThreadLevel; i++) {
         contexts.push_back(ThreadContext{i, atomic_counter, inputVec,
                                          outputVec, allVec, client, barrier,
-        shuffledQueue});
+        shuffledQueue, queueLock, outputVecLock, fillCount});
     }
 
     for (int i = 0; i < multiThreadLevel; i++) {
         pthread_create(&threads[i], nullptr, action, &contexts[i]);
     }
+
+
 
     // Join threads:
     for (int i = 0; i < multiThreadLevel; i++) {
@@ -170,14 +183,14 @@ void shuffleHandler(ThreadContext *threadContext)
             }
         }
         // Lock
-        pthread_mutex_lock(&queueLock);
+        pthread_mutex_lock(&(threadContext->queueLock));
         threadContext->queue.push_back(tempMaxVec);
         tempMaxVec.clear();
         // Unlock
-        pthread_mutex_unlock(&queueLock);
+        pthread_mutex_unlock(&threadContext->queueLock);
 
         // Semaphore wake up threads:
-        sem_post(&fillCount);
+        sem_post(&threadContext->fillCount);
     }
 
     cout << "done" << endl;
@@ -213,19 +226,18 @@ void* action(void* arg){
         shuffleHandler(threadContext);
     }
 
-
     // Reduce:
     vector<IntermediateVec>& queue = threadContext->queue;
     IntermediateVec queuePiece;
     while (!queue.empty())
     {
-        sem_wait(&fillCount);
+        sem_wait(&threadContext->fillCount);
         // Lock
-        pthread_mutex_lock(&queueLock);
+        pthread_mutex_lock(&threadContext->queueLock);
         queuePiece = queue[queue.size()-1];
         queue.pop_back();
         // Unlock
-        pthread_mutex_unlock(&queueLock);
+        pthread_mutex_unlock(&threadContext->queueLock);
         client.reduce(&queuePiece, threadContext);
 
     }
