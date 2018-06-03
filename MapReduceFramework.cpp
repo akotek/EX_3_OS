@@ -115,9 +115,9 @@ void emit3 (K3* key, V3* value, void* context)
     OutputVec& vec = threadContext->outputVec;
 
     OutputPair pair = {key, value};
-    pthread_mutex_lock(&outputVecLock);
+//    pthread_mutex_lock(&outputVecLock);
     vec.push_back(pair);
-    pthread_mutex_unlock(&outputVecLock);
+//    pthread_mutex_unlock(&outputVecLock);
 }
 
 K2& findK2max(vector<IntermediateVec>& allVec)
@@ -216,12 +216,13 @@ void* action(void* arg){
 
     // Reduce:
     vector<IntermediateVec>& queue = threadContext->queue;
+    IntermediateVec queuePiece;
     while (!queue.empty())
     {
         sem_wait(&fillCount);
         // Lock
         pthread_mutex_lock(&queueLock);
-        IntermediateVec queuePiece = queue[queue.size()-1];
+        queuePiece = queue[queue.size()-1];
         queue.pop_back();
         // Unlock
         pthread_mutex_unlock(&queueLock);
