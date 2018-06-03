@@ -4,7 +4,7 @@
 #include "MapReduceClient.h"
 #include "Barrier.h"
 #include <semaphore.h>
-
+#include <assert.h>
 using namespace std;
 
 pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
@@ -43,6 +43,15 @@ bool operator==(const K2& a, const K2& b)
 {
     return !(a < b) && !(b < a);
 }
+
+// func decelerations:
+// ---------------
+void emit2 (K2* key, V2* value, void* context);
+void emit3 (K3* key, V3* value, void* context);
+void* action(void* arg);
+// ---------------
+
+
 
 void runMapReduceFramework(const MapReduceClient& client,
                            const InputVec& inputVec, OutputVec& outputVec,
@@ -104,9 +113,11 @@ void emit3 (K3* key, V3* value, void* context)
     ThreadContext* threadContext = (ThreadContext*)context;
 
     OutputVec& vec = threadContext->outputVec;
-    OutputPair& pair = {key, value};
 
-
+    OutputPair pair = {key, value};
+    pthread_mutex_lock(&outputVecLock);
+    vec.push_back(pair);
+    pthread_mutex_unlock(&outputVecLock);
 }
 
 K2& findK2max(vector<IntermediateVec>& allVec)
@@ -193,7 +204,6 @@ void* action(void* arg){
     IntermediateVec& intermediateVec = threadContext->allVec[threadContext->threadId];
     std::sort(intermediateVec.begin(), intermediateVec.end(), InterMidGreater);
 
-
     // Launch barrier:
     threadContext->barrier.barrier();
 
@@ -206,20 +216,18 @@ void* action(void* arg){
 
     // Reduce:
     vector<IntermediateVec>& queue = threadContext->queue;
-    if(!queue.empty())
+    while (!queue.empty())
     {
         sem_wait(&fillCount);
-
         // Lock
         pthread_mutex_lock(&queueLock);
-        IntermediateVec& queuePiece = queue[queue.size()-1];
+        IntermediateVec queuePiece = queue[queue.size()-1];
         queue.pop_back();
         // Unlock
         pthread_mutex_unlock(&queueLock);
-
         client.reduce(&queuePiece, threadContext);
-    }
 
+    }
 
     pthread_exit(nullptr);
 }
