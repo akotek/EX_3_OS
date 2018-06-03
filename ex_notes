@@ -10,8 +10,6 @@ pthread.wait process:
     3. wake up and lock again- proceed code
     4. unlock mutex
 
-* what if exception is thrown when we lock a resource?
-guard(mutex) ??
 
 * think on thread_safety and exception_safe when we implement
 

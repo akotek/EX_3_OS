@@ -7,9 +7,6 @@
 using namespace std;
 
 
-
-
-
 struct ThreadContext{
     int threadId;
     std::atomic<int>& actionsCounter;
@@ -19,9 +16,7 @@ struct ThreadContext{
     const MapReduceClient& client;
     Barrier& barrier;
     vector<IntermediateVec>& queue;
-
     pthread_mutex_t& queueLock;
-    pthread_mutex_t& outputVecLock;
     sem_t& fillCount;
 
 };
@@ -60,15 +55,12 @@ void runMapReduceFramework(const MapReduceClient& client,
                            int multiThreadLevel){
 
 
-    pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_t outputVecLock = PTHREAD_MUTEX_INITIALIZER;
-    sem_t fillCount;
-
 
     // Init semaphores - init with value 0
     // To be increase by shuffler
+    pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
+    sem_t fillCount;
     sem_init(&fillCount, 0, 0);
-
 
     // Spawn threads,
     // Create a threadPool array
@@ -83,12 +75,10 @@ void runMapReduceFramework(const MapReduceClient& client,
     std::atomic<int> atomic_counter(0);
 
 
-
-
     for (int i = 0; i < multiThreadLevel; i++) {
         contexts.push_back(ThreadContext{i, atomic_counter, inputVec,
                                          outputVec, allVec, client, barrier,
-        shuffledQueue, queueLock, outputVecLock, fillCount});
+        shuffledQueue, queueLock, fillCount});
     }
 
     for (int i = 0; i < multiThreadLevel; i++) {
@@ -105,7 +95,6 @@ void runMapReduceFramework(const MapReduceClient& client,
 
     // Destroy semaphore && mutex:
     pthread_mutex_destroy(&queueLock);
-    pthread_mutex_destroy(&outputVecLock);
     sem_destroy(&fillCount);
     printf("Completed destroying Mutex and Semaphore \n");
 }
@@ -126,11 +115,9 @@ void emit3 (K3* key, V3* value, void* context)
     ThreadContext* threadContext = (ThreadContext*)context;
 
     OutputVec& vec = threadContext->outputVec;
-
     OutputPair pair = {key, value};
-//    pthread_mutex_lock(&outputVecLock);
+
     vec.push_back(pair);
-//    pthread_mutex_unlock(&outputVecLock);
 }
 
 K2& findK2max(vector<IntermediateVec>& allVec)

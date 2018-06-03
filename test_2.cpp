@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
         OutputVec *outputVec;
         outputVec = new OutputVec();
         std::string line;
-        std::ifstream input_file1(("/home/netanel/Documents/HUJI/OS/ex3/text_gen/text_" + std::to_string(i + 1)));
+        std::ifstream input_file1(("/cs/usr/kotek/Desktop/EX_3/test_ex3/text_gen/text_" + std::to_string(i + 1)));
         while (std::getline(input_file1, line)) {
             VString *s = new VString(line);
             inputVec->push_back({nullptr, s});
