@@ -50,6 +50,27 @@ void emit3 (K3* key, V3* value, void* context);
 void* action(void* arg);
 // ---------------
 
+// TESTING SECTION :: REMOVE AFTER
+// --------------------------------
+void shuffleTest(vector<IntermediateVec>& queue){
+
+    int counter = 0;
+    for (auto &vec : queue)
+    {
+        counter++;
+        K2& key = *(vec[0]).first;
+        for (IntermediatePair& pair1: vec){
+            if (!(*(pair1.first) == key)){
+                fprintf(stderr, "Shuffle failed on vec num %d", counter);
+                exit(1);
+            }
+        }
+    }
+    printf("Test succeeded \nChecked %d vectors for their equality\n", counter);
+}
+
+
+// --------------------------------
 void runMapReduceFramework(const MapReduceClient& client,
                            const InputVec& inputVec, OutputVec& outputVec,
                            int multiThreadLevel){
@@ -94,6 +115,8 @@ void runMapReduceFramework(const MapReduceClient& client,
     }
   //  printf("Completed joining %d threads \n", multiThreadLevel);
 
+
+    shuffleTest(shuffledQueue);
     // Destroy semaphore && mutex:
     pthread_mutex_destroy(&queueLock);
     pthread_mutex_destroy(&createThreadsLock);
@@ -195,9 +218,9 @@ void shuffleHandler(ThreadContext *threadContext)
 
     }
     // Shuffle ended: make True
-    pthread_mutex_lock(&threadContext->queueLock);
-    threadContext->shuffleEndedFlag = 1;
-    pthread_mutex_unlock(&threadContext->queueLock);
+//    pthread_mutex_lock(&threadContext->queueLock);
+//    threadContext->shuffleEndedFlag = 1;
+//    pthread_mutex_unlock(&threadContext->queueLock);
 }
 
 void* action(void* arg){
