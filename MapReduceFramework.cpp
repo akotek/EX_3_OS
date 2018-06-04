@@ -48,11 +48,9 @@ void* action(void* arg);
 // ---------------
 
 
-
 void runMapReduceFramework(const MapReduceClient& client,
                            const InputVec& inputVec, OutputVec& outputVec,
                            int multiThreadLevel){
-
 
     // Init semaphores - init with value 0
     // To be increase by shuffler
@@ -63,7 +61,7 @@ void runMapReduceFramework(const MapReduceClient& client,
     // Spawn threads,
     // Create a threadPool array
     // And init contexts:
-    multiThreadLevel -=1; //TODO find out about mainThread
+    if (multiThreadLevel > 1) multiThreadLevel -=1;
   //  printf("Creating %d threads \n", multiThreadLevel);
     pthread_t threads[multiThreadLevel];
     vector<ThreadContext> contexts;
