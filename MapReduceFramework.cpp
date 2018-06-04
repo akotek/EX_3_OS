@@ -19,6 +19,8 @@ struct ThreadContext{
     pthread_mutex_t& queueLock;
     sem_t& fillCount;
     int& shuffleEndedFlag;
+    int& queueCounter;
+    pthread_mutex_t& isShuffledLock;
 
 };
 
@@ -55,6 +57,7 @@ void runMapReduceFramework(const MapReduceClient& client,
     // Init semaphores - init with value 0
     // To be increase by shuffler
     pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t isShuffledLock = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_t createThreadsLock = PTHREAD_MUTEX_INITIALIZER;
     sem_t fillCount;
     sem_init(&fillCount, 0, 0);
@@ -71,11 +74,12 @@ void runMapReduceFramework(const MapReduceClient& client,
     vector<IntermediateVec> shuffledQueue;
     std::atomic<int> atomic_counter(0);
     int shuffleEnded = 0;
+    int queueCounter = 0;
 
     for (int i = 0; i < multiThreadLevel; i++) {
         contexts.push_back(ThreadContext{i, atomic_counter, inputVec,
                                          outputVec, allVec, client, barrier,
-        shuffledQueue, queueLock, fillCount, shuffleEnded});
+        shuffledQueue, queueLock, fillCount, shuffleEnded, queueCounter, isShuffledLock});
     }
 
     for (int i = 0; i < multiThreadLevel; i++) {
@@ -141,42 +145,59 @@ void shuffleHandler(ThreadContext *threadContext)
     // Find kMax value in all interMid pairs,
     // Collect from all vectors into a new one
     // Push at the end to new queue:
+    bool isEmpty = false;
 
     vector<IntermediateVec>& allVec = threadContext->allVec;
-    while (!allVec.empty())
+    while (!isEmpty)
     {
+        if(all_of(allVec.begin(), allVec.end(), [](IntermediateVec& vec){
+            return vec.empty(); }))
+        {
+            break;
+        }
 
         IntermediateVec tempMaxVec;
         K2& k2max = findK2max(allVec);
 
         for(IntermediateVec& intermediateVec : allVec)
         {
+            if(intermediateVec.empty())
+            {
+
+                allVec.erase(std::remove(allVec.begin(), allVec.end(), intermediateVec),
+                             allVec.end());
+            }
             while (!intermediateVec.empty() &&
-                   *(intermediateVec[intermediateVec.size()-1]).first == k2max)
+                   *(intermediateVec.back()).first == k2max)
             {
                 tempMaxVec.push_back(intermediateVec[intermediateVec.size()-1]);
                 intermediateVec.pop_back();
 
-                if(intermediateVec.empty())
-                {
-                    allVec.erase(std::remove(allVec.begin(), allVec.end(), intermediateVec),
-                                 allVec.end());
-                }
+//                if(intermediateVec.empty())
+//                {
+//                    allVec.erase(std::remove(allVec.begin(), allVec.end(), intermediateVec),
+//                                 allVec.end());
+//                }
             }
+
+
         }
 
         // Lock
         pthread_mutex_lock(&(threadContext->queueLock));
         threadContext->queue.push_back(tempMaxVec);
         tempMaxVec.clear();
+        threadContext->queueCounter++;
         // Unlock
-        pthread_mutex_unlock(&threadContext->queueLock);
-
         // Semaphore wake up threads:
         sem_post(&threadContext->fillCount);
+        pthread_mutex_unlock(&threadContext->queueLock);
+
     }
     // Shuffle ended: make True
+    pthread_mutex_lock(&threadContext->queueLock);
     threadContext->shuffleEndedFlag = 1;
+    pthread_mutex_unlock(&threadContext->queueLock);
 }
 
 void* action(void* arg){
@@ -211,28 +232,35 @@ void* action(void* arg){
 
     // Reduce:
     vector<IntermediateVec>& queue = threadContext->queue;
-    IntermediateVec queuePiece;
+//    IntermediateVec queuePiece;
 
     // while True:
-    while (1)
-    {
+//    while (true)
+//    {
+//
+//        sem_wait(&threadContext->fillCount);
+//        // lock shuffle queue before access
+//        pthread_mutex_lock(&threadContext->queueLock);
+//        if (threadContext->queueCounter == 0 &&
+//                threadContext->shuffleEndedFlag){
+//            sem_post(&threadContext->fillCount);
+//            pthread_mutex_unlock(&threadContext->queueLock);
+//            break;
+//        }
+//        else if (threadContext->queueCounter > 0)
+//        {
+//            // Lock
+////            queuePiece = queue[queue.size()-1];
+//            client.reduce(&queue.back(), threadContext);
+//            queue.pop_back();
+//            threadContext->queueCounter--;
+//            // Unlock
+//        }
+//        pthread_mutex_unlock(&threadContext->queueLock);
+//        sem_post(&threadContext->fillCount);
+//
+//    }
 
-        sem_wait(&threadContext->fillCount);
 
-        pthread_mutex_lock(&threadContext->queueLock);
-        if (queue.empty() && threadContext->shuffleEndedFlag){
-            sem_post(&threadContext->fillCount);
-            pthread_mutex_unlock(&threadContext->queueLock);
-            break;
-        }
-        // Lock
-        queuePiece = queue[queue.size()-1];
-        queue.pop_back();
-        // Unlock
-        pthread_mutex_unlock(&threadContext->queueLock);
-        client.reduce(&queuePiece, threadContext);
-
-    }
-
-    pthread_exit(nullptr);
+//    pthread_exit(nullptr);
 }
