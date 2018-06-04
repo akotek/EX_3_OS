@@ -18,6 +18,7 @@ struct ThreadContext{
     vector<IntermediateVec>& queue;
     pthread_mutex_t& queueLock;
     sem_t& fillCount;
+    int& shuffleEndedFlag;
 
 };
 
@@ -69,18 +70,19 @@ void runMapReduceFramework(const MapReduceClient& client,
     vector<IntermediateVec> allVec(multiThreadLevel); // vector of vectors
     vector<IntermediateVec> shuffledQueue;
     std::atomic<int> atomic_counter(0);
+    int shuffleEnded = 0;
 
-    pthread_mutex_lock(&createThreadsLock);
     for (int i = 0; i < multiThreadLevel; i++) {
         contexts.push_back(ThreadContext{i, atomic_counter, inputVec,
                                          outputVec, allVec, client, barrier,
-        shuffledQueue, queueLock, fillCount});
+        shuffledQueue, queueLock, fillCount, shuffleEnded});
     }
 
     for (int i = 0; i < multiThreadLevel; i++) {
+        pthread_mutex_lock(&createThreadsLock);
         pthread_create(&threads[i], nullptr, action, &contexts[i]);
+        pthread_mutex_unlock(&createThreadsLock);
     }
-    pthread_mutex_unlock(&createThreadsLock);
 
     // Join threads:
     for (int i = 0; i < multiThreadLevel; i++) {
@@ -90,6 +92,7 @@ void runMapReduceFramework(const MapReduceClient& client,
 
     // Destroy semaphore && mutex:
     pthread_mutex_destroy(&queueLock);
+    pthread_mutex_destroy(&createThreadsLock);
     sem_destroy(&fillCount);
    // printf("Completed destroying Mutex and Semaphore \n");
 }
@@ -172,7 +175,8 @@ void shuffleHandler(ThreadContext *threadContext)
         // Semaphore wake up threads:
         sem_post(&threadContext->fillCount);
     }
- //   printf("Shuffling is done ");
+    // Shuffle ended: make True
+    threadContext->shuffleEndedFlag = 1;
 }
 
 void* action(void* arg){
@@ -208,11 +212,20 @@ void* action(void* arg){
     // Reduce:
     vector<IntermediateVec>& queue = threadContext->queue;
     IntermediateVec queuePiece;
-    while (!queue.empty())
+
+    // while True:
+    while (1)
     {
+
         sem_wait(&threadContext->fillCount);
-        // Lock
+
         pthread_mutex_lock(&threadContext->queueLock);
+        if (queue.empty() && threadContext->shuffleEndedFlag){
+            sem_post(&threadContext->fillCount);
+            pthread_mutex_unlock(&threadContext->queueLock);
+            break;
+        }
+        // Lock
         queuePiece = queue[queue.size()-1];
         queue.pop_back();
         // Unlock

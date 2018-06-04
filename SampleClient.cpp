@@ -66,37 +66,37 @@ public:
 };
 
 
-//int main(int argc, char** argv)
-//{
-//	CounterClient client;
-//	InputVec inputVec;
-//	OutputVec outputVec; // starts empty
-//	for (int i = 0; i< 10000; i++){
-//		VString s1("A");
-//		VString s2("BB");
-//		VString s3("CCC");
-//    	VString s4("DDDD");
-//    	VString s5("EEEEEBB");
-//    	VString s6("FFFFFFFF");
-//		inputVec.push_back({nullptr, &s1});
-//		inputVec.push_back({nullptr, &s2});
-//		inputVec.push_back({nullptr, &s3});
-//		inputVec.push_back({nullptr, &s4});
-//		inputVec.push_back({nullptr, &s5});
-//		inputVec.push_back({nullptr, &s6});
-//	}
-//	runMapReduceFramework(client, inputVec, outputVec, 3);
-//    // 4
-//
-//	for (OutputPair& pair: outputVec) {
-//		char c = ((const KChar*)pair.first)->c;
-//		int count = ((const VCount*)pair.second)->count;
-//		printf("The character %c appeared %d time%s\n",
-//			c, count, count > 1 ? "s" : "");
-//		delete pair.first;
-//		delete pair.second;
-//	}
-//
-//	return 0;
-//}
+int main(int argc, char** argv)
+{
+	CounterClient client;
+	InputVec inputVec;
+	OutputVec outputVec; // starts empty
+	for (int i = 0; i< 10000; i++){
+		VString s1("A");
+		VString s2("BB");
+		VString s3("CCC");
+    	VString s4("DDDD");
+    	VString s5("EEEEEBB");
+    	VString s6("FFFFFFFF");
+		inputVec.push_back({nullptr, &s1});
+		inputVec.push_back({nullptr, &s2});
+		inputVec.push_back({nullptr, &s3});
+		inputVec.push_back({nullptr, &s4});
+		inputVec.push_back({nullptr, &s5});
+		inputVec.push_back({nullptr, &s6});
+	}
+	runMapReduceFramework(client, inputVec, outputVec, 3);
+    // 4
+
+	for (OutputPair& pair: outputVec) {
+		char c = ((const KChar*)pair.first)->c;
+		int count = ((const VCount*)pair.second)->count;
+		printf("The character %c appeared %d time%s\n",
+			c, count, count > 1 ? "s" : "");
+		delete pair.first;
+		delete pair.second;
+	}
+
+	return 0;
+}
 
