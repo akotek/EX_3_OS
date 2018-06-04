@@ -47,7 +47,6 @@ void emit3 (K3* key, V3* value, void* context);
 void* action(void* arg);
 // ---------------
 
-
 void runMapReduceFramework(const MapReduceClient& client,
                            const InputVec& inputVec, OutputVec& outputVec,
                            int multiThreadLevel){
@@ -55,6 +54,7 @@ void runMapReduceFramework(const MapReduceClient& client,
     // Init semaphores - init with value 0
     // To be increase by shuffler
     pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t createThreadsLock = PTHREAD_MUTEX_INITIALIZER;
     sem_t fillCount;
     sem_init(&fillCount, 0, 0);
 
@@ -70,7 +70,7 @@ void runMapReduceFramework(const MapReduceClient& client,
     vector<IntermediateVec> shuffledQueue;
     std::atomic<int> atomic_counter(0);
 
-
+    pthread_mutex_lock(&createThreadsLock);
     for (int i = 0; i < multiThreadLevel; i++) {
         contexts.push_back(ThreadContext{i, atomic_counter, inputVec,
                                          outputVec, allVec, client, barrier,
@@ -80,17 +80,18 @@ void runMapReduceFramework(const MapReduceClient& client,
     for (int i = 0; i < multiThreadLevel; i++) {
         pthread_create(&threads[i], nullptr, action, &contexts[i]);
     }
+    pthread_mutex_unlock(&createThreadsLock);
 
     // Join threads:
     for (int i = 0; i < multiThreadLevel; i++) {
         pthread_join(threads[i], nullptr);
     }
-    //printf("Completed joining %d threads \n", multiThreadLevel);
+  //  printf("Completed joining %d threads \n", multiThreadLevel);
 
     // Destroy semaphore && mutex:
     pthread_mutex_destroy(&queueLock);
     sem_destroy(&fillCount);
-  //  printf("Completed destroying Mutex and Semaphore \n");
+   // printf("Completed destroying Mutex and Semaphore \n");
 }
 
 void emit2 (K2* key, V2* value, void* context){
@@ -171,8 +172,7 @@ void shuffleHandler(ThreadContext *threadContext)
         // Semaphore wake up threads:
         sem_post(&threadContext->fillCount);
     }
-
-    //cout << "Shuffling is done" << endl;
+ //   printf("Shuffling is done ");
 }
 
 void* action(void* arg){
