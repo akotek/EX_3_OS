@@ -4,6 +4,8 @@
 #include "MapReduceClient.h"
 #include "Barrier.h"
 #include <semaphore.h>
+#include <assert.h>
+
 using namespace std;
 
 
@@ -20,7 +22,12 @@ struct ThreadContext{
     sem_t& fillCount;
     int& shuffleEndedFlag;
     int& queueCounter;
-    pthread_mutex_t& isShuffledLock;
+    IntermediateVec& tempMaxVec;
+    IntermediatePair* tempMaxPair;
+    int& counter;
+    K2* k2max;
+
+
 
 };
 
@@ -40,8 +47,12 @@ bool operator==(const IntermediatePair& a, const IntermediatePair& b)
 
 bool operator==(const K2& a, const K2& b)
 {
-    return !(a < b) && !(b < a);
+    bool c = !(a < b) && !(b < a);
+    return c;
 }
+
+static const auto isEmpty = [](IntermediateVec& vec) { return vec.empty();};
+
 
 // func decelerations:
 // ---------------
@@ -96,11 +107,17 @@ void runMapReduceFramework(const MapReduceClient& client,
     std::atomic<int> atomic_counter(0);
     int shuffleEnded = 0;
     int queueCounter = 0;
+    IntermediateVec tempMaxVec;
+    IntermediatePair tempMaxPair;
+    int counter = 0;
+    K2* k2max;
+
 
     for (int i = 0; i < multiThreadLevel; i++) {
         contexts.push_back(ThreadContext{i, atomic_counter, inputVec,
                                          outputVec, allVec, client, barrier,
-        shuffledQueue, queueLock, fillCount, shuffleEnded, queueCounter, isShuffledLock});
+        shuffledQueue, queueLock, fillCount, shuffleEnded, queueCounter, tempMaxVec,
+                                         &tempMaxPair, counter, k2max});
     }
 
     for (int i = 0; i < multiThreadLevel; i++) {
@@ -116,7 +133,6 @@ void runMapReduceFramework(const MapReduceClient& client,
   //  printf("Completed joining %d threads \n", multiThreadLevel);
 
 
-    shuffleTest(shuffledQueue);
     // Destroy semaphore && mutex:
     pthread_mutex_destroy(&queueLock);
     pthread_mutex_destroy(&createThreadsLock);
@@ -145,83 +161,66 @@ void emit3 (K3* key, V3* value, void* context)
     vec.push_back(pair);
 }
 
-K2& findK2max(vector<IntermediateVec>& allVec)
+void findK2max(ThreadContext *threadContext)
 {
-    K2* k2max = allVec[0][allVec[0].size()-1].first;
-    for(IntermediateVec& intermediateVec : allVec)
+    bool isK2maxInitialized = false;
+    for (IntermediateVec& vec : threadContext->allVec)
     {
-        if (!intermediateVec.empty())
+        if(vec.empty()) continue;
+
+        if (!isK2maxInitialized)
         {
-            K2 *tempKey = intermediateVec[intermediateVec.size() - 1].first;
-            if (k2max < tempKey)
-            {
-                k2max = tempKey;
-            }
+            // first entry initialization
+            threadContext->k2max = vec.back().first;
+            isK2maxInitialized = true;
+        }
+        else if(threadContext->k2max < &(*vec.back().first))
+        {
+            threadContext->k2max = vec.back().first;
         }
     }
-    return *k2max;
 }
+
+
 
 void shuffleHandler(ThreadContext *threadContext)
 {
-
-    // Find kMax value in all interMid pairs,
-    // Collect from all vectors into a new one
-    // Push at the end to new queue:
-    bool isEmpty = false;
-
-    vector<IntermediateVec>& allVec = threadContext->allVec;
-    while (!isEmpty)
+    // checks if all sub-vectors are empty
+    while (!(all_of(threadContext->allVec.begin(),
+                         threadContext->allVec.end(),
+                         isEmpty)))
     {
-        if(all_of(allVec.begin(), allVec.end(), [](IntermediateVec& vec){
-            return vec.empty(); }))
+        findK2max(threadContext);
+
+        for (IntermediateVec& vec : threadContext->allVec)
         {
-            break;
-        }
+            if(vec.empty()) continue;
 
-        IntermediateVec tempMaxVec;
-        K2& k2max = findK2max(allVec);
 
-        for(IntermediateVec& intermediateVec : allVec)
-        {
-            if(intermediateVec.empty())
+            while ((*threadContext->k2max) == (*vec.back().first))
             {
-
-                allVec.erase(std::remove(allVec.begin(), allVec.end(), intermediateVec),
-                             allVec.end());
+                threadContext->tempMaxPair = &vec.back();
+                threadContext->tempMaxVec.push_back(
+                        *threadContext->tempMaxPair);
+                vec.pop_back();
+                if (vec.empty())
+                {
+                    break;
+                }
             }
-            while (!intermediateVec.empty() &&
-                   *(intermediateVec.back()).first == k2max)
-            {
-                tempMaxVec.push_back(intermediateVec[intermediateVec.size()-1]);
-                intermediateVec.pop_back();
-
-//                if(intermediateVec.empty())
-//                {
-//                    allVec.erase(std::remove(allVec.begin(), allVec.end(), intermediateVec),
-//                                 allVec.end());
-//                }
-            }
-
-
         }
-
-        // Lock
-        pthread_mutex_lock(&(threadContext->queueLock));
-        threadContext->queue.push_back(tempMaxVec);
-        tempMaxVec.clear();
-        threadContext->queueCounter++;
-        // Unlock
-        // Semaphore wake up threads:
+        pthread_mutex_lock(&threadContext->queueLock);
+        threadContext->queue.push_back(threadContext->tempMaxVec);
         sem_post(&threadContext->fillCount);
+        threadContext->counter++;
         pthread_mutex_unlock(&threadContext->queueLock);
-
+        threadContext->tempMaxVec.clear();
     }
-    // Shuffle ended: make True
-//    pthread_mutex_lock(&threadContext->queueLock);
-//    threadContext->shuffleEndedFlag = 1;
-//    pthread_mutex_unlock(&threadContext->queueLock);
+    pthread_mutex_lock(&threadContext->queueLock);
+//    *tc->shuffle_flag = 0;
+    pthread_mutex_unlock(&threadContext->queueLock);
 }
+
 
 void* action(void* arg){
 
@@ -250,11 +249,15 @@ void* action(void* arg){
     // Shuffle by thread 0:
     if (threadContext->threadId == 0)
     {
+
         shuffleHandler(threadContext);
+        shuffleTest(threadContext->queue);
     }
 
+
+
     // Reduce:
-    vector<IntermediateVec>& queue = threadContext->queue;
+//    vector<IntermediateVec>& queue = threadContext->queue;
 //    IntermediateVec queuePiece;
 
     // while True:
@@ -284,6 +287,5 @@ void* action(void* arg){
 //
 //    }
 
-
-//    pthread_exit(nullptr);
+    pthread_exit(nullptr);
 }
