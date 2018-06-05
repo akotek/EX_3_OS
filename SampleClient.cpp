@@ -71,7 +71,7 @@ int main(int argc, char** argv)
 	CounterClient client;
 	InputVec inputVec;
 	OutputVec outputVec; // starts empty
-	for (int i = 0; i < 200000; i++){
+	for (int i = 0; i < 2; i++){
 		VString s1("A");
 		VString s2("BB");
 		VString s3("CCC");

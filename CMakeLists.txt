@@ -4,7 +4,7 @@ project(EX_3)
 set(CMAKE_CXX_STANDARD 11)
 
 set(SOURCE_FILES MapReduceClient.h MapReduceFramework.h
-        MapReduceFramework.cpp test_2.cpp Barrier.cpp
+        MapReduceFramework.cpp SampleClient.cpp Barrier.cpp
         Barrier.h
         )
 add_executable(EX_3 ${SOURCE_FILES})
