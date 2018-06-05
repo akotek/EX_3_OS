@@ -264,6 +264,7 @@ void* action(void* arg){
         // Shuffle ended, stop reducing:
         if (queue.empty() && threadContext->shuffleEndedFlag)
         {
+            pthread_mutex_unlock(&threadContext->queueLock);
             sem_post(&threadContext->fillCount);
             break;
         }
