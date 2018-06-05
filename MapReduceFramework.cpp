@@ -59,7 +59,6 @@ static const auto isEmpty = [](IntermediateVec& vec) { return vec.empty();};
 void emit2 (K2* key, V2* value, void* context);
 void emit3 (K3* key, V3* value, void* context);
 void* action(void* arg);
-void shuffleTest(vector<IntermediateVec>& queue);
 // ---------------
 
 // TESTING SECTION :: REMOVE AFTER
@@ -194,6 +193,8 @@ void shuffleHandler(ThreadContext *threadContext)
             if(vecToShuffle.empty()) continue;
             while ((*threadContext->k2max) == (*vecToShuffle.back().first))
             {
+                // Gather all same K's to one vec,
+                // Push at the end
                 threadContext->tempMaxPair = &vecToShuffle.back();
                 threadContext->tempMaxVec.push_back(*threadContext->tempMaxPair);
                 vecToShuffle.pop_back();
@@ -207,12 +208,12 @@ void shuffleHandler(ThreadContext *threadContext)
         pthread_mutex_lock(&threadContext->queueLock);
         threadContext->queue.push_back(threadContext->tempMaxVec);
         sem_post(&threadContext->fillCount);
+        threadContext->tempMaxVec.clear(); //TODO check if this belongs here??
         // Unlock
         pthread_mutex_unlock(&threadContext->queueLock);
-        threadContext->tempMaxVec.clear();
     }
 
-    threadContext->shuffleEndedFlag = true;
+    threadContext->shuffleEndedFlag = 1;
 }
 
 void* action(void* arg){
