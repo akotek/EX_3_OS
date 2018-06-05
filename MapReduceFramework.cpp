@@ -23,6 +23,8 @@ struct ThreadContext{
     IntermediateVec& tempMaxVec;
     IntermediatePair* tempMaxPair;
     K2* k2max;
+    IntermediateVec& queuePiece;
+    pthread_mutex_t& reduceLock;
 
 
 
@@ -86,7 +88,7 @@ void runMapReduceFramework(const MapReduceClient& client,
     // Init semaphores - init with value 0
     // To be increase by shuffler
     pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_t isShuffledLock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t reduceLock = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_t createThreadsLock = PTHREAD_MUTEX_INITIALIZER;
     sem_t fillCount;
     sem_init(&fillCount, 0, 0);
@@ -106,13 +108,14 @@ void runMapReduceFramework(const MapReduceClient& client,
     IntermediateVec tempMaxVec;
     IntermediatePair tempMaxPair;
     K2* k2max;
+    IntermediateVec queuePiece;
 
 
     for (int i = 0; i < multiThreadLevel; i++) {
         contexts.push_back(ThreadContext{i, atomic_counter, inputVec,
                                          outputVec, allVec, client, barrier,
         shuffledQueue, queueLock, fillCount, shuffleEnded, tempMaxVec,
-                                         &tempMaxPair, k2max});
+                                         &tempMaxPair, k2max, queuePiece, reduceLock});
     }
 
     for (int i = 0; i < multiThreadLevel; i++) {
@@ -150,10 +153,12 @@ void emit3 (K3* key, V3* value, void* context)
 {
     ThreadContext* threadContext = (ThreadContext*)context;
 
+    pthread_mutex_lock(&threadContext->reduceLock);
     OutputVec& vec = threadContext->outputVec;
     OutputPair pair = {key, value};
 
     vec.push_back(pair);
+    pthread_mutex_unlock(&threadContext->reduceLock);
 }
 
 void findK2max(ThreadContext *threadContext)
@@ -190,7 +195,6 @@ void shuffleHandler(ThreadContext *threadContext)
         for (IntermediateVec& vecToShuffle : threadContext->allVec)
         {
             if(vecToShuffle.empty()) continue;
-
 
             while ((*threadContext->k2max) == (*vecToShuffle.back().first))
             {
@@ -246,7 +250,7 @@ void* action(void* arg){
     {
 
         shuffleHandler(threadContext);
-        shuffleTest(threadContext->queue);
+//        shuffleTest(threadContext->queue);
     }
 
 
@@ -255,15 +259,13 @@ void* action(void* arg){
 //    vector<IntermediateVec>& queue = threadContext->queue;
 //    IntermediateVec queuePiece;
 
-    // while True:
 //    while (true)
 //    {
 //
 //        sem_wait(&threadContext->fillCount);
 //        // lock shuffle queue before access
 //        pthread_mutex_lock(&threadContext->queueLock);
-//        if (threadContext->queueCounter == 0 &&
-//                threadContext->shuffleEndedFlag){
+//        if (threadContext->shuffleEndedFlag){
 //            sem_post(&threadContext->fillCount);
 //            pthread_mutex_unlock(&threadContext->queueLock);
 //            break;
@@ -281,6 +283,28 @@ void* action(void* arg){
 //        sem_post(&threadContext->fillCount);
 //
 //    }
+
+    // Reduce:
+    vector<IntermediateVec>& queue = threadContext->queue;
+    while (true)
+    {
+        sem_wait(&threadContext->fillCount);
+        pthread_mutex_lock(&threadContext->queueLock);
+        if (queue.empty()) continue;
+        if (threadContext->shuffleEndedFlag)
+        {
+            pthread_mutex_unlock(&threadContext->queueLock);
+            sem_post(&threadContext->fillCount);
+            break;
+        }
+
+        IntermediateVec& queuePiece = queue.back();
+        queue.pop_back();
+        // Unlock
+        pthread_mutex_unlock(&threadContext->queueLock);
+        client.reduce(&queuePiece, threadContext);
+        sem_post(&threadContext->fillCount);
+    }
 
     pthread_exit(nullptr);
 }
