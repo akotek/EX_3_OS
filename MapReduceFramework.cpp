@@ -250,61 +250,29 @@ void* action(void* arg){
     {
 
         shuffleHandler(threadContext);
-//        shuffleTest(threadContext->queue);
     }
-
-
-
-    // Reduce:
-//    vector<IntermediateVec>& queue = threadContext->queue;
-//    IntermediateVec queuePiece;
-
-//    while (true)
-//    {
-//
-//        sem_wait(&threadContext->fillCount);
-//        // lock shuffle queue before access
-//        pthread_mutex_lock(&threadContext->queueLock);
-//        if (threadContext->shuffleEndedFlag){
-//            sem_post(&threadContext->fillCount);
-//            pthread_mutex_unlock(&threadContext->queueLock);
-//            break;
-//        }
-//        else if (threadContext->queueCounter > 0)
-//        {
-//            // Lock
-////            queuePiece = queue[queue.size()-1];
-//            client.reduce(&queue.back(), threadContext);
-//            queue.pop_back();
-//            threadContext->queueCounter--;
-//            // Unlock
-//        }
-//        pthread_mutex_unlock(&threadContext->queueLock);
-//        sem_post(&threadContext->fillCount);
-//
-//    }
 
     // Reduce:
     vector<IntermediateVec>& queue = threadContext->queue;
     while (true)
     {
         sem_wait(&threadContext->fillCount);
-        pthread_mutex_lock(&threadContext->queueLock);
-        if (queue.empty()) continue;
-        if (threadContext->shuffleEndedFlag)
+
+        if(!queue.empty())
         {
+            pthread_mutex_lock(&threadContext->queueLock);
+            threadContext->queuePiece = queue.back();
+            queue.pop_back();
+            // Unlock
+            client.reduce(&threadContext->queuePiece, threadContext);
+            threadContext->queuePiece.clear();
             pthread_mutex_unlock(&threadContext->queueLock);
+        }
+        if (queue.empty() && threadContext->shuffleEndedFlag)
+        {
             sem_post(&threadContext->fillCount);
             break;
         }
-
-        IntermediateVec& queuePiece = queue.back();
-        queue.pop_back();
-        // Unlock
-        pthread_mutex_unlock(&threadContext->queueLock);
-        client.reduce(&queuePiece, threadContext);
-        sem_post(&threadContext->fillCount);
     }
-
     pthread_exit(nullptr);
 }
