@@ -1,24 +1,31 @@
-CC = g++
-STD = -std=gnu++11
+#Constants for flags and commands:
+CXX = g++
+CXXFLAGS = -c -Wall -std=c++11
+FILES = Barrier.cpp Barrier.h Makefile MapReduceFramework.cpp README
 
-MAP_REDUCE_OBJS = MapReduceFramework.cpp MapReduceFramework.h MapReduceClient.h
-test_2.cpp Barrier.cpp Barrier.h
+all: MapReduceFrameworkLib
 
-TAROBJECTS = uthreads.cpp uthreads.h Makefile README
+#Library for libMapReduceFramework.a
+MapReduceFrameworkLib: MapReduceFramework.o Barrier.o
+		ar -rcs libMapReduceFramework.a MapReduceFramework.o Barrier.o
 
-CFLAGS = -Wextra -Wvla -Wall -Wno-unused-parameter
+#Takes care for MapReduceFramework.o
+MapReduceFramework.o: MapReduceFramework.cpp MapReduceFramework.h MapReduceClient.h Barrier.o
+		$(CXX) $(CXXFLAGS) MapReduceFramework.cpp -o MapReduceFramework.o
 
-all: map_reduce
+#Takes care for Barrier.o
+Barrier.o: Barrier.cpp Barrier.h
+		$(CXX) $(CXXFLAGS) Barrier.cpp -o Barrier.o
 
-map_reduce: $(MAP_REDUCE_OBJS)
-	${CC} $(STD) ${CFLAGS} -c MapReduceFramework.cpp MapReduceFramework.h MapReduceClient.h
-                              test_2.cpp Barrier.cpp Barrier.h -o mapreduce.o
-	ar rcs libuthreads.a mapreduce.o
 
+# Makes the tar file:
 tar:
-	tar cvf ex3.tar ${TAROBJECTS}
+		tar -cvf ex3.tar $(FILES)
 
+# cleaning:
 clean:
-	rm -f ex2.tar mapreduce.o mapreduce.a
+		rm -f *.o libMapReduceFramework.a ex3.tar
+		rm -f *.out
 
-.PHONY: all uthreads tar clean
+
+
