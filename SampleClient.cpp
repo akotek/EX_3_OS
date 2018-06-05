@@ -71,12 +71,12 @@ int main(int argc, char** argv)
 	CounterClient client;
 	InputVec inputVec;
 	OutputVec outputVec; // starts empty
-	for (int i = 0; i< 10000; i++){
+	for (int i = 0; i < 100; i++){
 		VString s1("A");
 		VString s2("BB");
 		VString s3("CCC");
     	VString s4("DDDD");
-    	VString s5("EEEEEBB");
+    	VString s5("EEEEE");
     	VString s6("FFFFFFFF");
 		inputVec.push_back({nullptr, &s1});
 		inputVec.push_back({nullptr, &s2});

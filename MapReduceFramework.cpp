@@ -4,7 +4,6 @@
 #include "MapReduceClient.h"
 #include "Barrier.h"
 #include <semaphore.h>
-
 using namespace std;
 
 
@@ -247,7 +246,7 @@ void* action(void* arg){
     if (threadContext->threadId == 0)
     {
         shuffleHandler(threadContext);
-       // shuffleTest(threadContext->queue);
+        //shuffleTest(threadContext->queue);
     }
 
     // Reduce:
@@ -258,13 +257,11 @@ void* action(void* arg){
 
         if(!queue.empty())
         {
+            // Lock
             pthread_mutex_lock(&threadContext->queueLock);
-//            threadContext->queuePiece = queue.back();
-            // Unlock
             client.reduce(&queue.back(), threadContext);
             queue.pop_back();
-
-//            threadContext->queuePiece.clear();
+            // Unlock
             pthread_mutex_unlock(&threadContext->queueLock);
         }
         if (queue.empty() && threadContext->shuffleEndedFlag)
