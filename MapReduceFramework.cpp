@@ -246,7 +246,7 @@ void* action(void* arg){
     if (threadContext->threadId == 0)
     {
         shuffleHandler(threadContext);
-        //shuffleTest(threadContext->queue);
+   //     shuffleTest(threadContext->queue);
     }
 
     // Reduce:
