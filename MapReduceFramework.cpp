@@ -26,8 +26,6 @@ struct ThreadContext{
     IntermediateVec& queuePiece;
     pthread_mutex_t& reduceLock;
 
-
-
 };
 
 struct {
@@ -97,7 +95,7 @@ void runMapReduceFramework(const MapReduceClient& client,
     // Create a threadPool array
     // And init contexts:
     if (multiThreadLevel > 1) multiThreadLevel -=1;
-  //  printf("Creating %d threads \n", multiThreadLevel);
+    printf("Creating %d threads \n", multiThreadLevel);
     pthread_t threads[multiThreadLevel];
     vector<ThreadContext> contexts;
     Barrier barrier(multiThreadLevel);
@@ -128,14 +126,15 @@ void runMapReduceFramework(const MapReduceClient& client,
     for (int i = 0; i < multiThreadLevel; i++) {
         pthread_join(threads[i], nullptr);
     }
-  //  printf("Completed joining %d threads \n", multiThreadLevel);
+    printf("Completed joining %d threads \n", multiThreadLevel);
 
 
     // Destroy semaphore && mutex:
     pthread_mutex_destroy(&queueLock);
     pthread_mutex_destroy(&createThreadsLock);
+    pthread_mutex_destroy(&reduceLock);
     sem_destroy(&fillCount);
-   // printf("Completed destroying Mutex and Semaphore \n");
+    printf("Completed destroying Mutex and Semaphore \n");
 }
 
 void emit2 (K2* key, V2* value, void* context){
@@ -186,8 +185,7 @@ void findK2max(ThreadContext *threadContext)
 void shuffleHandler(ThreadContext *threadContext)
 {
     // checks if all sub-vectors are empty
-    while (!(all_of(threadContext->allVec.begin(),
-                         threadContext->allVec.end(),
+    while (!(all_of(threadContext->allVec.begin(), threadContext->allVec.end(),
                          isEmpty)))
     {
             findK2max(threadContext);
@@ -215,9 +213,9 @@ void shuffleHandler(ThreadContext *threadContext)
         pthread_mutex_unlock(&threadContext->queueLock);
         threadContext->tempMaxVec.clear();
     }
-    pthread_mutex_lock(&threadContext->queueLock);
+  //  pthread_mutex_lock(&threadContext->queueLock);
     threadContext->shuffleEndedFlag = true;
-    pthread_mutex_unlock(&threadContext->queueLock);
+    //pthread_mutex_unlock(&threadContext->queueLock);
 }
 
 
@@ -248,8 +246,8 @@ void* action(void* arg){
     // Shuffle by thread 0:
     if (threadContext->threadId == 0)
     {
-
         shuffleHandler(threadContext);
+       // shuffleTest(threadContext->queue);
     }
 
     // Reduce:
@@ -261,11 +259,12 @@ void* action(void* arg){
         if(!queue.empty())
         {
             pthread_mutex_lock(&threadContext->queueLock);
-            threadContext->queuePiece = queue.back();
-            queue.pop_back();
+//            threadContext->queuePiece = queue.back();
             // Unlock
-            client.reduce(&threadContext->queuePiece, threadContext);
-            threadContext->queuePiece.clear();
+            client.reduce(&queue.back(), threadContext);
+            queue.pop_back();
+
+//            threadContext->queuePiece.clear();
             pthread_mutex_unlock(&threadContext->queueLock);
         }
         if (queue.empty() && threadContext->shuffleEndedFlag)
@@ -273,6 +272,8 @@ void* action(void* arg){
             sem_post(&threadContext->fillCount);
             break;
         }
+
     }
+
     pthread_exit(nullptr);
 }
