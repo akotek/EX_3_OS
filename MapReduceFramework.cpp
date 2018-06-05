@@ -18,7 +18,7 @@ struct ThreadContext{
     vector<IntermediateVec>& queue;
     pthread_mutex_t& queueLock;
     sem_t& fillCount;
-    bool& shuffleEndedFlag;
+    int& shuffleEndedFlag;
     IntermediateVec& tempMaxVec;
     IntermediatePair* tempMaxPair;
     K2* k2max;
@@ -73,9 +73,10 @@ void shuffleTest(vector<IntermediateVec>& queue){
             }
         }
     }
-    printf("Test succeeded \nChecked %d vectors for their equality\n", counter);
-}
 
+    printf("Test succeeded \nChecked %d vectors for their equality\n",
+            counter);
+}
 
 // --------------------------------
 void runMapReduceFramework(const MapReduceClient& client,
@@ -101,12 +102,11 @@ void runMapReduceFramework(const MapReduceClient& client,
     vector<IntermediateVec> allVec(multiThreadLevel); // vector of vectors
     vector<IntermediateVec> shuffledQueue;
     std::atomic<int> atomic_counter(0);
-    bool shuffleEnded = false;
+    int shuffleEnded = 0;
     IntermediateVec tempMaxVec;
     IntermediatePair tempMaxPair;
     K2* k2max;
     IntermediateVec queuePiece;
-
 
     for (int i = 0; i < multiThreadLevel; i++) {
         contexts.push_back(ThreadContext{i, atomic_counter, inputVec,
@@ -116,16 +116,16 @@ void runMapReduceFramework(const MapReduceClient& client,
     }
 
     for (int i = 0; i < multiThreadLevel; i++) {
-        pthread_mutex_lock(&createThreadsLock);
+        //pthread_mutex_lock(&createThreadsLock);
         pthread_create(&threads[i], nullptr, action, &contexts[i]);
-        pthread_mutex_unlock(&createThreadsLock);
+        //pthread_mutex_unlock(&createThreadsLock);
     }
 
     // Join threads:
     for (int i = 0; i < multiThreadLevel; i++) {
         pthread_join(threads[i], nullptr);
     }
-    printf("Completed joining %d threads \n", multiThreadLevel);
+  //  printf("Completed joining %d threads \n", multiThreadLevel);
 
 
     // Destroy semaphore && mutex:
@@ -133,7 +133,7 @@ void runMapReduceFramework(const MapReduceClient& client,
     pthread_mutex_destroy(&createThreadsLock);
     pthread_mutex_destroy(&reduceLock);
     sem_destroy(&fillCount);
-    printf("Completed destroying Mutex and Semaphore \n");
+ //   printf("Completed destroying Mutex and Semaphore \n");
 }
 
 void emit2 (K2* key, V2* value, void* context){
@@ -172,14 +172,12 @@ void findK2max(ThreadContext *threadContext)
             threadContext->k2max = vec.back().first;
             isK2maxInitialized = true;
         }
-        else if(threadContext->k2max < &(*vec.back().first))
+        else if(*threadContext->k2max < (*vec.back().first))
         {
             threadContext->k2max = vec.back().first;
         }
     }
 }
-
-
 
 void shuffleHandler(ThreadContext *threadContext)
 {
@@ -187,8 +185,8 @@ void shuffleHandler(ThreadContext *threadContext)
     while (!(all_of(threadContext->allVec.begin(), threadContext->allVec.end(),
                          isEmpty)))
     {
-            findK2max(threadContext);
 
+        findK2max(threadContext);
         for (IntermediateVec& vecToShuffle : threadContext->allVec)
         {
             if(vecToShuffle.empty()) continue;
@@ -196,8 +194,7 @@ void shuffleHandler(ThreadContext *threadContext)
             while ((*threadContext->k2max) == (*vecToShuffle.back().first))
             {
                 threadContext->tempMaxPair = &vecToShuffle.back();
-                threadContext->tempMaxVec.push_back(
-                        *threadContext->tempMaxPair);
+                threadContext->tempMaxVec.push_back(*threadContext->tempMaxPair);
                 vecToShuffle.pop_back();
                 if (vecToShuffle.empty())
                 {
@@ -246,7 +243,8 @@ void* action(void* arg){
     if (threadContext->threadId == 0)
     {
         shuffleHandler(threadContext);
-   //     shuffleTest(threadContext->queue);
+        //shuffleTest(threadContext->queue);
+
     }
 
     // Reduce:
