@@ -7,26 +7,29 @@
 using namespace std;
 
 
+// Thread context
+// ------------------
 struct ThreadContext{
     int threadId;
     std::atomic<int>& actionsCounter;
     const InputVec& inputVec;
     OutputVec& outputVec;
-    vector<IntermediateVec>& allVec;
     const MapReduceClient& client;
     Barrier& barrier;
+    vector<IntermediateVec>& allVec;
     vector<IntermediateVec>& queue;
-    pthread_mutex_t& queueLock;
-    sem_t& fillCount;
-    int& shuffleEndedFlag;
-    IntermediateVec& tempMaxVec;
-    IntermediatePair* tempMaxPair;
+    IntermediateVec& tempMaxVec; // Not sure it should be here
+    IntermediatePair* tempMaxPair; // Not sure it should be here
+    int& shuffleEndedFlag; // Boolean
     K2* k2max;
-    IntermediateVec& queuePiece;
+    sem_t& fillCount;
+    pthread_mutex_t& queueLock;
     pthread_mutex_t& reduceLock;
-
 };
+// ------------------
 
+// Operators for sorting (== op)
+// ------------------
 struct {
     bool operator()(const IntermediatePair& a, const IntermediatePair& b) const
     {
@@ -35,7 +38,6 @@ struct {
 
 } InterMidGreater;
 
-// equal operator for the shuffleHandler section
 bool operator==(const IntermediatePair& a, const IntermediatePair& b)
 {
     return !(*a.first < *b.first) && !(*b.first < *a.first);
@@ -46,7 +48,9 @@ bool operator==(const K2& a, const K2& b)
     bool c = !(a < b) && !(b < a);
     return c;
 }
+// ------------------
 
+// Lambda
 static const auto isEmpty = [](IntermediateVec& vec) { return vec.empty();};
 
 
@@ -55,6 +59,7 @@ static const auto isEmpty = [](IntermediateVec& vec) { return vec.empty();};
 void emit2 (K2* key, V2* value, void* context);
 void emit3 (K3* key, V3* value, void* context);
 void* action(void* arg);
+void shuffleTest(vector<IntermediateVec>& queue);
 // ---------------
 
 // TESTING SECTION :: REMOVE AFTER
@@ -73,18 +78,16 @@ void shuffleTest(vector<IntermediateVec>& queue){
             }
         }
     }
-
     printf("Test succeeded \nChecked %d vectors for their equality\n",
             counter);
 }
-
 // --------------------------------
 void runMapReduceFramework(const MapReduceClient& client,
                            const InputVec& inputVec, OutputVec& outputVec,
                            int multiThreadLevel){
 
     // Init semaphores - init with value 0
-    // To be increase by shuffler
+    // To be increased by shuffler
     pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_t reduceLock = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_t createThreadsLock = PTHREAD_MUTEX_INITIALIZER;
@@ -95,7 +98,7 @@ void runMapReduceFramework(const MapReduceClient& client,
     // Create a threadPool array
     // And init contexts:
     if (multiThreadLevel > 1) multiThreadLevel -=1;
-    printf("Creating %d threads \n", multiThreadLevel);
+   // printf("Creating %d threads \n", multiThreadLevel);
     pthread_t threads[multiThreadLevel];
     vector<ThreadContext> contexts;
     Barrier barrier(multiThreadLevel);
@@ -106,19 +109,16 @@ void runMapReduceFramework(const MapReduceClient& client,
     IntermediateVec tempMaxVec;
     IntermediatePair tempMaxPair;
     K2* k2max;
-    IntermediateVec queuePiece;
 
     for (int i = 0; i < multiThreadLevel; i++) {
         contexts.push_back(ThreadContext{i, atomic_counter, inputVec,
-                                         outputVec, allVec, client, barrier,
-        shuffledQueue, queueLock, fillCount, shuffleEnded, tempMaxVec,
-                                         &tempMaxPair, k2max, queuePiece, reduceLock});
+                                         outputVec, client, barrier, allVec,
+        shuffledQueue, tempMaxVec, &tempMaxPair, shuffleEnded, k2max, fillCount
+        , queueLock, reduceLock});
     }
 
     for (int i = 0; i < multiThreadLevel; i++) {
-        //pthread_mutex_lock(&createThreadsLock);
         pthread_create(&threads[i], nullptr, action, &contexts[i]);
-        //pthread_mutex_unlock(&createThreadsLock);
     }
 
     // Join threads:
@@ -151,11 +151,13 @@ void emit3 (K3* key, V3* value, void* context)
 {
     ThreadContext* threadContext = (ThreadContext*)context;
 
+    // Lock
     pthread_mutex_lock(&threadContext->reduceLock);
     OutputVec& vec = threadContext->outputVec;
     OutputPair pair = {key, value};
 
-    vec.push_back(pair);
+    vec.push_back(pair); // Copies by val
+    // Unlock
     pthread_mutex_unlock(&threadContext->reduceLock);
 }
 
@@ -168,11 +170,11 @@ void findK2max(ThreadContext *threadContext)
 
         if (!isK2maxInitialized)
         {
-            // first entry initialization
+            // First entry initialization
             threadContext->k2max = vec.back().first;
             isK2maxInitialized = true;
         }
-        else if(*threadContext->k2max < (*vec.back().first))
+        else if(*threadContext->k2max < (*vec.back().first)) // Uses inner-op
         {
             threadContext->k2max = vec.back().first;
         }
@@ -181,7 +183,7 @@ void findK2max(ThreadContext *threadContext)
 
 void shuffleHandler(ThreadContext *threadContext)
 {
-    // checks if all sub-vectors are empty
+    // Lambda: checks if all sub-Vecs are empty:
     while (!(all_of(threadContext->allVec.begin(), threadContext->allVec.end(),
                          isEmpty)))
     {
@@ -190,7 +192,6 @@ void shuffleHandler(ThreadContext *threadContext)
         for (IntermediateVec& vecToShuffle : threadContext->allVec)
         {
             if(vecToShuffle.empty()) continue;
-
             while ((*threadContext->k2max) == (*vecToShuffle.back().first))
             {
                 threadContext->tempMaxPair = &vecToShuffle.back();
@@ -202,18 +203,17 @@ void shuffleHandler(ThreadContext *threadContext)
                 }
             }
         }
-
+        // Lock
         pthread_mutex_lock(&threadContext->queueLock);
         threadContext->queue.push_back(threadContext->tempMaxVec);
         sem_post(&threadContext->fillCount);
+        // Unlock
         pthread_mutex_unlock(&threadContext->queueLock);
         threadContext->tempMaxVec.clear();
     }
-  //  pthread_mutex_lock(&threadContext->queueLock);
-    threadContext->shuffleEndedFlag = true;
-    //pthread_mutex_unlock(&threadContext->queueLock);
-}
 
+    threadContext->shuffleEndedFlag = true;
+}
 
 void* action(void* arg){
 
@@ -222,17 +222,17 @@ void* action(void* arg){
     // Increment val
     int oldVal = (threadContext->actionsCounter)++;
 
+    // Map:
     // Get pair of oldVal and map it
     const MapReduceClient& client = threadContext->client;
     const int inputSize = (int)threadContext->inputVec.size();
 
     while (oldVal < inputSize){
-        // Map:
         const InputPair& pair = threadContext->inputVec[oldVal];
         client.map(pair.first, pair.second, threadContext);
         oldVal = (threadContext->actionsCounter)++;
     }
-    // Sort
+    // Sort:
     IntermediateVec& intermediateVec = threadContext->allVec[threadContext->threadId];
     std::sort(intermediateVec.begin(), intermediateVec.end(), InterMidGreater);
 
@@ -244,7 +244,6 @@ void* action(void* arg){
     {
         shuffleHandler(threadContext);
         //shuffleTest(threadContext->queue);
-
     }
 
     // Reduce:
@@ -252,7 +251,6 @@ void* action(void* arg){
     while (true)
     {
         sem_wait(&threadContext->fillCount);
-
         if(!queue.empty())
         {
             // Lock
@@ -262,13 +260,12 @@ void* action(void* arg){
             // Unlock
             pthread_mutex_unlock(&threadContext->queueLock);
         }
+        // Shuffle ended, stop reducing:
         if (queue.empty() && threadContext->shuffleEndedFlag)
         {
             sem_post(&threadContext->fillCount);
             break;
         }
-
     }
-
     pthread_exit(nullptr);
 }

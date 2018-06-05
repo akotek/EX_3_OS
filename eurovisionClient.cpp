@@ -143,7 +143,8 @@ int main(int argc, char **argv) {
     OutputVec outputVec;
 
     // TODO - enter your path to "new_clients/points_awarded.in"
-    process_data("/cs/usr/kotek/Desktop/EX_3/points_awarded.in", &inputVec);
+    process_data("/cs/usr/kotek/Desktop/EX_3/test_clients/points_awarded.in",
+                 &inputVec);
 
     runMapReduceFramework(client, inputVec, outputVec, 40);
 

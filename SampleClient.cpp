@@ -71,7 +71,7 @@ int main(int argc, char** argv)
 	CounterClient client;
 	InputVec inputVec;
 	OutputVec outputVec; // starts empty
-	for (int i = 0; i < 2; i++){
+	for (int i = 0; i < 20000; i++){
 		VString s1("A");
 		VString s2("BB");
 		VString s3("CCC");
@@ -85,7 +85,7 @@ int main(int argc, char** argv)
 		inputVec.push_back({nullptr, &s5});
 		inputVec.push_back({nullptr, &s6});
 	}
-	runMapReduceFramework(client, inputVec, outputVec, 5);
+	runMapReduceFramework(client, inputVec, outputVec, 3);
     // 4
 
 	for (OutputPair& pair: outputVec) {

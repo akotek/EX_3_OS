@@ -6,7 +6,7 @@
  *
  */
 
-#include "test_clients/MapReduceFramework.h"
+#include "MapReduceFramework.h"
 #include <cstdio>
 #include <cstdlib>
 

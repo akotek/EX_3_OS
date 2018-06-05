@@ -1,6 +1,6 @@
 // ------------------------------ includes ------------------------------
-#include "MapReduceClient.h"
-#include "MapReduceFramework.h"
+#include "../MapReduceClient.h"
+#include "../MapReduceFramework.h"
 #include <stdio.h>
 #include <signal.h>
 #include <sys/time.h>
