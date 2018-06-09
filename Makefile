@@ -1,31 +1,40 @@
-#Constants for flags and commands:
-CXX = g++
-CXXFLAGS = -c -Wall -std=c++11
-FILES = Barrier.cpp Barrier.h Makefile MapReduceFramework.cpp README
+CC=g++
+CXX=g++
+RANLIB=ranlib
 
-all: MapReduceFrameworkLib
+LIBSRC=Barrier.h Barrier.cpp MapReduceFramework.cpp MapReduceFramework.h MapReduceClient.h 
+LIBOBJ= MapReduceFramework.o Barrier.o
+TARSRCS = Barrier.h Barrier.cpp MapReduceFramework.cpp Makefile README
 
-#Library for libMapReduceFramework.a
-MapReduceFrameworkLib: MapReduceFramework.o Barrier.o
-		ar -rcs libMapReduceFramework.a MapReduceFramework.o Barrier.o
+INCS=-I.
+CFLAGS = -Wall -std=c++11 -g $(INCS)
+CXXFLAGS = -Wall -std=c++11 -g $(INCS)
 
-#Takes care for MapReduceFramework.o
-MapReduceFramework.o: MapReduceFramework.cpp MapReduceFramework.h MapReduceClient.h Barrier.o
-		$(CXX) $(CXXFLAGS) MapReduceFramework.cpp -o MapReduceFramework.o
+OSMLIB = libMapReduceFramework.a
+TARGETS = $(OSMLIB)
 
-#Takes care for Barrier.o
-Barrier.o: Barrier.cpp Barrier.h
-		$(CXX) $(CXXFLAGS) Barrier.cpp -o Barrier.o
+TAR=tar
+VAL=valgrind
+TARFLAGS=-cvf
+VALGFLAGS=leak-check=full
+VALGFLAGS1=show-possibly-lost=yes
+VALGFLAGS2=show-reachable=yes
+TARNAME=ex3.tar
 
+.PHONY: all, clean, tar
 
-# Makes the tar file:
-tar:
-		tar -cvf ex3.tar $(FILES)
+all: $(TARGETS)
 
-# cleaning:
+$(TARGETS): $(LIBOBJ)
+	$(AR) $(ARFLAGS) $@ $^
+	$(RANLIB) $@
+
 clean:
-		rm -f *.o libMapReduceFramework.a ex3.tar
-		rm -f *.out
+	$(RM) $(LIBOBJ) $(OSMLIB) *~ *core
 
 
+depend:
+	makedepend -- $(CFLAGS) -- $(SRC) $(LIBSRC)
 
+tar:
+	$(TAR) $(TARFLAGS) $(TARNAME) $(TARSRCS)

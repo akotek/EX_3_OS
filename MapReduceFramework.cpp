@@ -93,7 +93,7 @@ void runMapReduceFramework(const MapReduceClient& client,
     int shuffleEnded = 0;
     IntermediateVec tempMaxVec;
     IntermediatePair tempMaxPair;
-    K2* k2max;
+    K2* k2max = nullptr;
 
     for (int i = 0; i < multiThreadLevel; i++) {
         contexts.push_back(ThreadContext{i, atomic_counter, inputVec,
