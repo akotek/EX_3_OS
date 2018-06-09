@@ -1,0 +1,10 @@
+kotek, yoavabadi
+Aviv Kotek (203973490), Yoav Abadi (305613903)
+EX: 3  OS 2018
+
+FILES:
+Makefile - The makefile
+MapReduceFramework.cpp
+Barrier.cpp
+Barrier.h
+README - This file
